@@ -5,6 +5,8 @@ import openephys as oe
 from scipy import signal
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import time
+import seaborn as sns
 
 
 class Threshold_Crossing(Recording):
@@ -14,6 +16,7 @@ class Threshold_Crossing(Recording):
         self.dat_name = dat_name
         self.conversion_factor=conversion_factor
         self.data = self._load_dat()
+        self.rec_length = len(self.data[0])/self.get_fs()
         self.threshold_crossings = None
         self.amplitudes = None
 
@@ -33,7 +36,8 @@ class Threshold_Crossing(Recording):
     def get_data(self):
         return self.data
 
-
+    def get_rec_length(self):
+        return self.rec_length
 
     def set_threshold_crossings(self, *, pol='neg', lim=4, inter_spike_window=1, method='quian', tqdm_on=True):
         print('Bandpassing data, this make take some time...')
@@ -62,21 +66,26 @@ class Threshold_Crossing(Recording):
         isw = inter_spike_window*fs/1000
         spikes = []
         chan_count = 0
+        times = []
         for chan, threshold in zip(bp_data, thresholds):
             print('Finding spikes on chan %d...' % chan_count)
             chan_spikes = []
+            st = time.time()
             prev_spike = -isw
-            for time_index, val in tqdm(enumerate(chan)):
+            for time_index, val in enumerate(chan):
                 if val > lim*threshold and time_index - prev_spike > isw:
                     #print(time_index)
                     spike_snip = chan[time_index:int(time_index+isw)]
                     spike_peak = np.argmax(spike_snip)
-                    chan_spikes.append(time_index+spike_peak)
+                    chan_spikes.append((time_index+spike_peak)/self.get_fs())
                     prev_spike = spike_peak + time_index
             spikes.append(chan_spikes)
-            print('Found %d spikes on chan %d' % (len(chan_spikes), chan_count))
+            tt = time.time() - st
+            times.append(tt)
+            print('Found %d spikes on chan %d in %f s' % (len(chan_spikes), chan_count, tt))
             chan_count += 1
         self.threshold_crossings = spikes
+        print('Found %d crossings on %d channels in %f s' % (sum([len(i) for i in spikes]), chan_count, sum(times)))
         print('Threshold crossings found and set!')
 
     def set_amplitudes(self, *, amplitude_type='minmax', pre_spike_window=1, post_spike_window=2):
@@ -118,11 +127,10 @@ class Threshold_Crossing(Recording):
     def get_firing_rate(self, chan_num, *, bin_size=1):
         tcs = self.get_threshold_crossings()[chan_num]
         data = self.get_data()
-        histy, histx = np.histogram(tcs, bins=np.arange(0, len(data[0]), bin_size*self.get_fs()))
-        histx = histx/self.get_fs()
+        histy, histx = np.histogram(tcs, bins=np.arange(0, len(data[0])/self.get_fs(), bin_size))
+        histx = histx
         histy = histy/bin_size
         return histx[:-1], histy
-
 
     def plot_firing_rate(self, chan_num, *, start=0, end=None, bin_size=1):
         xs, firing_rate = self.get_firing_rate(chan_num, bin_size=bin_size)
@@ -133,6 +141,41 @@ class Threshold_Crossing(Recording):
             plt.xlim(start, max(xs))
         else:
             plt.xlim(start, end)
+
+    def plot_events(self, *, channels='All', colors='k', start=0, end=None):
+        tcs = self.get_threshold_crossings()
+        if channels == 'All':
+            plt_tcs = tcs
+        else:
+            plt_tcs = [tcs[i] for i in channels]
+
+        plt.eventplot(plt_tcs, color=colors, linelengths=0.8)
+        plt.ylim(-0.5, len(plt_tcs)-0.5)
+        if end is None:
+            end = self.get_rec_length()
+        plt.xlim(start, end)
+        plt.xlabel('Time (s)')
+        plt.ylabel('Channels')
+
+
+    def plot_crossing_heatmap(self, *, bin_size=1, chans='All', scale=None, cmap='plasma'):
+        frs = []
+        if chans == 'All':
+            chans = range(self.get_channel_count())
+        frs = [self.get_firing_rate(chan_num, bin_size=bin_size)[1] for chan_num in chans]
+        frs = np.array(frs)
+        print(frs.shape)
+        if scale == 'log10':
+            print('Scale set to log10')
+            frs = np.log10(frs)
+            frs[(frs == -np.inf)] = 0
+        plt.figure(figsize=(10, 5))
+        ax = sns.heatmap(frs, cmap=cmap)
+        ax.invert_yaxis()
+        plt.xlabel('Time (s)')
+        plt.ylabel('Channels')
+
+
 
 
 def bandpass_data(data, *, lowcut=300, highcut=6000, fs=30000, order=3):
@@ -150,10 +193,26 @@ tc.set_threshold_crossings()
 print(len(tc.get_threshold_crossings()[-1]))
 x, y  = tc.get_firing_rate(1)
 tc.set_amplitudes()
-
+tc.plot_events()
 plt.plot(x, y)
-tc.plot_firing_rate(1, bin_size=0.3)
-
+tc.plot_firing_rate(1, bin_size=0.1)
+tc.plot_crossing_heatmap()
+frs = [tc.get_firing_rate(chan_num)[1] for chan_num in range(tc.get_channel_count())]
+frs = np.array(frs)
+print(np.array(frs).shape)
+plt.figure(figsize=(10, 4))
+plt.imshow(frs[:, :30], )
+plt.colorbar(fraction=0.046, pad=0.04)
+plt.figure(figsize=(10, 5))
+ax = sns.heatmap(log_10_frs, cmap='plasma')
+ax.invert_yaxis()
+log_10_frs = np.log10(frs)
+print(np.max(frs), np.max(log_10_frs))
+log_10_frs[(log_10_frs == -np.inf)] = 0
+print(np.min(log_10_frs))
+plt.xlabel('Time (s)')
+plt.ylabel('Channel')
+print(10**-0.08)
 test = oe.loadContinuous2("/Volumes/lab-schaefera/working/warnert/Recordings/jULIE recordings - 2019/Deep cortex recording/191017/2019-10-17_16-11-58/100_CH16.continuous")
 data = tc.get_data()
 bp_data = bandpass_data(data[:, :100000])
