@@ -10,6 +10,9 @@ import seaborn as sns
 
 
 class Threshold_Crossing(Recording):
+    '''
+    Finds and holds information about threshold crossings
+    '''
 
     def __init__(self, home_dir, channel_count, *, fs=30000, dat_name='100_CHs.dat', conversion_factor=0.195):
         Recording.__init__(self, home_dir, channel_count, fs)
@@ -126,11 +129,7 @@ class Threshold_Crossing(Recording):
 
     def get_firing_rate(self, chan_num, *, bin_size=1):
         tcs = self.get_threshold_crossings()[chan_num]
-        data = self.get_data()
-        histy, histx = np.histogram(tcs, bins=np.arange(0, len(data[0])/self.get_fs(), bin_size))
-        histx = histx
-        histy = histy/bin_size
-        return histx[:-1], histy
+        self.Recording.get_firing_rate()
 
     def plot_firing_rate(self, chan_num, *, start=0, end=None, bin_size=1):
         xs, firing_rate = self.get_firing_rate(chan_num, bin_size=bin_size)
