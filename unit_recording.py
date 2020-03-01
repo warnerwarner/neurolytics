@@ -57,10 +57,10 @@ class Unit_Recording(Recording):
         return clusters
 
 
-
-cluster = Cluster([[1], [3], [4]], None, None, None, None, None, None, np.array([[10, 1, 5], [1, 3, 5]]))
-eh = [1]
-try:
-    assert isinstance(eh, Cluster)
-except(AssertionError):
-    raise AssertionError('Need to add Cluster object')
+if __name__ == '__main__':
+    cluster = Cluster([[1], [3], [4]], None, None, None, None, None, None, np.array([[10, 1, 5], [1, 3, 5]]))
+    eh = [1]
+    try:
+        assert isinstance(eh, Cluster)
+    except(AssertionError):
+        raise AssertionError('Need to add Cluster object')
