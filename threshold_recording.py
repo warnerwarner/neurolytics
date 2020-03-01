@@ -1,4 +1,4 @@
-from recording import Recording
+import recording
 import numpy as np
 import os
 import openephys as oe
@@ -9,13 +9,13 @@ import time
 import seaborn as sns
 
 
-class Threshold_Crossing(Recording):
+class Threshold_Crossing(recording.Recording):
     '''
     Finds and holds information about threshold crossings
     '''
 
     def __init__(self, home_dir, channel_count, *, fs=30000, dat_name='100_CHs.dat', conversion_factor=0.195):
-        Recording.__init__(self, home_dir, channel_count, fs)
+        recording.Recording.__init__(self, home_dir, channel_count, fs)
         self.dat_name = dat_name
         self.conversion_factor=conversion_factor
         self.data = self._load_dat()
@@ -87,7 +87,7 @@ class Threshold_Crossing(Recording):
             times.append(tt)
             print('Found %d spikes on chan %d in %f s' % (len(chan_spikes), chan_count, tt))
             chan_count += 1
-        self.threshold_crossings = spikes
+        self._set_spikes(spikes)
         print('Found %d crossings on %d channels in %f s' % (sum([len(i) for i in spikes]), chan_count, sum(times)))
         print('Threshold crossings found and set!')
 
@@ -128,8 +128,8 @@ class Threshold_Crossing(Recording):
         return self.threshold_crossings
 
     def get_firing_rate(self, chan_num, *, bin_size=1):
-        tcs = self.get_threshold_crossings()[chan_num]
-        self.Recording.get_firing_rate()
+        tcs = recording.get_threshold_crossings()[chan_num]
+        xs, ys = recording.get_firing_rate(tcs, )
 
     def plot_firing_rate(self, chan_num, *, start=0, end=None, bin_size=1):
         xs, firing_rate = self.get_firing_rate(chan_num, bin_size=bin_size)
