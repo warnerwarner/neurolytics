@@ -1,19 +1,21 @@
-from recording import Recording
+
 import os
 import numpy as np
-from cluster import Cluster
+from spiking import Cluster
 import csv
+from threshold_recording import Threshold_Recording
 
-class Unit_Recording(Recording):
+class Unit_Recording(Threshold_Recording):
 
-    def __init__(self, home_dir, channel_count, fs):
-        Recording.__init__(self, home_dir, channel_count, fs)
+    def __init__(self, home_dir, channel_count, *, fs=30000, dat_name='100_CHs.dat', conversion_factor=0.195):
+        Threshold_Recording.__init__(self, home_dir, channel_count, fs)
         self.clusters = self._set_clusters()
+        self.channel_map = np.load(os.path.join(home_dir, 'channel_map.npy'))
+        self.channel_positions = np.load(os.path.join(home_dir, 'channel_positions.npy'))
+
 
     def _set_clusters(self):
         home_dir = self.get_home_dir()
-        channel_map = np.load(os.path.join(home_dir, 'channel_map.npy'))
-        channel_positions = np.load(os.path.join(home_dir, 'channel_positions.npy'))
         spike_clusters = np.load(os.path.join(home_dir, 'spike_clusters.npy'))
         spike_templates = np.load(os.path.join(home_dir, 'spike_templates.npy'))
         spike_times = np.load(os.path.join(home_dir, 'spike_times.npy'))
@@ -34,7 +36,7 @@ class Unit_Recording(Recording):
             c_temp = templates[c_temp_index]
 
             # Create a cluster and add to the ClusterSet
-            cluster = Cluster(channel_map, channel_positions, cluster_num, c_times, home_dir, c_label, c_temp_index, c_temp)
+            cluster = Cluster(cluster_num, c_times, home_dir, c_label, c_temp_index, c_temp)
             clusters.append(cluster)
         return clusters
 
@@ -56,6 +58,12 @@ class Unit_Recording(Recording):
         clusters = [i for i in self.get_all_clusters() if i.get_label() == 'good']
         return clusters
 
+    def get_non_noise_clusters(self):
+        clusters = [i for i in self.get_all_clusters() if i.get_label() == 'good' or i.get_label() == 'mua']
+        return clusters
+
+    def get_channel_map(self):
+        return self.channel_map
 
 if __name__ == '__main__':
     cluster = Cluster([[1], [3], [4]], None, None, None, None, None, None, np.array([[10, 1, 5], [1, 3, 5]]))

@@ -5,7 +5,7 @@ import time
 from scipy import signal
 import matplotlib.pyplot as plt
 
-class RecordingBase():
+class Recording():
     '''
     A bit of a mess right now, base for recording objects
     Holds general information about a recording
@@ -228,9 +228,8 @@ def bandpass_data(data, *, lowcut=300, highcut=6000, fs=30000, order=3):
     nyq = 0.5*fs
     low = lowcut/nyq
     high = highcut/nyq
-    sos = signal.butter(3, [low, high], analog=False, btype='band',
-                        output='sos')
-    y = signal.sosfiltfilt(sos, data)
+    b, a = signal.butter(3, [low, high], analog=False, btype='band')
+    y = signal.filtfilt(b, a, data)
     return y
 
 if __name__ == '__main__':
