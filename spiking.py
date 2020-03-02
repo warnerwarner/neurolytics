@@ -35,7 +35,8 @@ class Spiking():
         xs, ys = self.get_firing_rate(exp_length, bin_size=bin_size)
         ax.plot(xs, ys)
 
-
+    def _set_spike_times(self, spike_times):
+        self.times = spike_times
 
 class Cluster(Spiking):
     '''
@@ -44,24 +45,23 @@ class Cluster(Spiking):
     Information includes cluster number, spiking times, the recording dir, cluster label and templates
     '''
 
-    def __init__(self, cluster_num, times, recording_dir, label, template_ind, template):
+    def __init__(self, cluster_num, times, recording_dir, label, template_ind, template, max_chan):
         Spiking.__init__(self, times, recording_dir)
         self.cluster_num = cluster_num
         self.label = label
         self.template_ind = template_ind
         self.template = template
-        self.max_chan = self._find_max_chan()
+        self.max_chan = max_chan
 
-    def _find_max_chan(self):
-        '''
-        Find the maximum template channel - used for amplitude calculations
-        '''
-        maxes = [max(abs(i)) for i in self.template.T]
-        max_chan = self.channel_map[np.argmax(maxes)]
-        return max_chan[0]
+    def get_label(self):
+        return self.label
+
+    def get_cluster_num(self):
+        return self.cluster_num
 
     def get_max_chan(self):
         return self.max_chan
+
 
 
 class ThresholdCrossings(Spiking):

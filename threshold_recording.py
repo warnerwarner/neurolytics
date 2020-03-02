@@ -1,10 +1,9 @@
 import recording
 import numpy as np
-import os
+
 import openephys as oe
 from scipy import signal
 import matplotlib.pyplot as plt
-from tqdm import tqdm
 import time
 import seaborn as sns
 from spiking import ThresholdCrossings
@@ -16,7 +15,7 @@ class Threshold_Recording(recording.Recording):
     '''
 
     def __init__(self, home_dir, channel_count, *, fs=30000, dat_name='100_CHs.dat', conversion_factor=0.195):
-        recording.RecordingBase.__init__(self, home_dir, channel_count, fs, dat_name, conversion_factor)
+        recording.Recording.__init__(self, home_dir, channel_count, fs=fs, dat_name=dat_name, conversion_factor=conversion_factor)
         self.threshold_crossings = []
 
     def _set_threshold_crossings(self, tcs):

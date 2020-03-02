@@ -4,35 +4,41 @@ import numpy as np
 import openephys as oe
 import os
 
+
 class Binary_recording(Unit_Recording):
 
     def __init__(self, home_dir, channel_count, trial_names, *, trig_chan='100_ADC6.continuous', trial_length=0.12):
-        Unit_Recording.__init__(home_dir, channel_count)
+        Unit_Recording.__init__(self, home_dir, channel_count)
         self.trig_chan = trig_chan
-        self.trial_starts = []
         self.trial_names = trial_names
         self.trial_length = trial_length
+        self.trial_starts = None
         self.repeats = []
+        self._find_trial_starts()
 
-
-    def _set_trial_start(self, trial_starts):
-        self.trial_starts = trial_starts
+    def _set_trial_starts(self, trial_starts):
+        self.trial_starts = np.array(trial_starts)
 
     def get_trig_chan(self):
-        return self.trig_chan()
+        return self.trig_chan
 
-
-    def find_trial_starts(self):
+    def _find_trial_starts(self):
+        print('Finding trial starts using trigger of %s' % self.get_trig_chan())
         trig = oe.loadContinuous2(os.path.join(self.get_home_dir(), self.get_trig_chan()))['data']
-        trial_length = self.get_trial_length()
         fs = self.get_fs()
-        prev_trial = -trial_length*fs
+        trial_length = self.get_trial_length()*fs
+        prev_trial = -trial_length
         trial_starts = []
         for index, val in enumerate(trig):
             if val > 2 and index - prev_trial > trial_length:
                 trial_starts.append(index)
                 prev_trial = index
-        self.
+        try:
+            assert len(trial_starts) == len(self.get_trial_names())
+        except (AssertionError):
+            raise ValueError('Different lengths of trial starts (%d) and trial names (%d)' % (len(trial_starts),
+                                                                                              len(self.get_trial_names())))
+        self._set_trial_starts(trial_starts)
 
     def get_trial_names(self):
         return self.trial_names
@@ -47,7 +53,7 @@ class Binary_recording(Unit_Recording):
         return list(set(self.get_trial_names()))
 
     def get_unique_trial_starts(self, trial_name):
-        return self.get_trial_starts()[(self.get_trial_names() == trial_name)]
+        return [j for i, j in zip(self.get_trial_names(), self.get_trial_starts()) if i == trial_name]
 
     def get_cluster_trial_response(self, trial_name, cluster_num, *, pre_trial_window=0.5, post_trial_window=0.5):
         cluster = self.get_cluster(cluster_num)
@@ -56,8 +62,9 @@ class Binary_recording(Unit_Recording):
         cluster_trial_spikes = []
         for start in starts:
             window_start = start - pre_trial_window*self.get_fs()
-            window_end = start + (pre_trial_window+self.get_trial_length())*self.get_fs()
-            trial_spikes = cluster_spikes[int(window_start):int(window_end)]
+            window_end = start + (post_trial_window+self.get_trial_length())*self.get_fs()
+            trial_spikes = cluster_spikes[(cluster_spikes >= int(window_start)) & (cluster_spikes <= int(window_end))]
+            trial_spikes = [i - start for i in trial_spikes]
             cluster_trial_spikes.append(trial_spikes)
         return cluster_trial_spikes
 
