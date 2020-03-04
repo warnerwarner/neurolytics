@@ -1,4 +1,5 @@
 from unit_recording import Unit_Recording
+
 import spiking
 import numpy as np
 import openephys as oe
@@ -13,11 +14,15 @@ class Binary_recording(Unit_Recording):
         self.trial_names = trial_names
         self.trial_length = trial_length
         self.trial_starts = None
+        self.trial_ends = None
         self.repeats = []
         self._find_trial_starts()
 
     def _set_trial_starts(self, trial_starts):
         self.trial_starts = np.array(trial_starts)
+
+    def _set_trial_ends(self, trial_ends):
+        self.trial_ends = trial_ends
 
     def get_trig_chan(self):
         return self.trig_chan
@@ -38,6 +43,9 @@ class Binary_recording(Unit_Recording):
         except (AssertionError):
             raise ValueError('Different lengths of trial starts (%d) and trial names (%d)' % (len(trial_starts),
                                                                                               len(self.get_trial_names())))
+
+        trial_ends = [i+self.get_trial_length()*self.get_fs() for i in trial_starts]
+        self._set_trial_ends(trial_ends)
         self._set_trial_starts(trial_starts)
 
     def get_trial_names(self):
@@ -45,6 +53,9 @@ class Binary_recording(Unit_Recording):
 
     def get_trial_starts(self):
         return self.trial_starts
+
+    def get_trial_ends(self):
+        return self.trial_ends
 
     def get_trial_length(self):
         return self.trial_length
@@ -60,10 +71,15 @@ class Binary_recording(Unit_Recording):
         cluster_spikes = cluster.get_spike_times()
         starts = self.get_unique_trial_starts(trial_name)
         cluster_trial_spikes = []
+        sniff_basis = self.get_if_sniff_basis()
         for start in starts:
-            window_start = start - pre_trial_window*self.get_fs()
-            window_end = start + (post_trial_window+self.get_trial_length())*self.get_fs()
-            trial_spikes = cluster_spikes[(cluster_spikes >= int(window_start)) & (cluster_spikes <= int(window_end))]
+            if not sniff_basis:
+                window_start = start - pre_trial_window*self.get_fs()
+                window_end = start + (post_trial_window+self.get_trial_length())*self.get_fs()
+            else:
+                window_start = int(start - pre_trial_window)
+                window_end = int(start + post_trial_window)
+            trial_spikes = cluster_spikes[(cluster_spikes >= window_start) & (cluster_spikes <= window_end)]
             trial_spikes = [i - start for i in trial_spikes]
             cluster_trial_spikes.append(trial_spikes)
         return cluster_trial_spikes

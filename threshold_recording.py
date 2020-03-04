@@ -32,7 +32,7 @@ class Threshold_Recording(recording.Recording):
         '''
 
         print('Bandpassing data, this make take some time...')
-        bp_data = bandpass_data(self.get_data())
+        bp_data = bandpass_data(self.data)
         print('Threshold set by %s' % method)
         if method == 'std':
             thresholds = np.std(bp_data, axis=1)
@@ -52,7 +52,7 @@ class Threshold_Recording(recording.Recording):
         elif pol == 'both':
             bp_data = abs(bp_data)
 
-        fs = self.get_fs()
+        fs = self.fs
 
         isw = inter_spike_window*fs/1000
         tcs = []
@@ -67,19 +67,16 @@ class Threshold_Recording(recording.Recording):
                 if val > lim*threshold and time_index - prev_spike > isw:
                     spike_snip = chan[time_index:int(time_index+isw)]
                     spike_peak = np.argmax(spike_snip)
-                    chan_spikes.append((time_index+spike_peak)/self.get_fs())  # Set it in seconds
+                    chan_spikes.append((time_index+spike_peak)/self.fs)  # Set it in seconds
                     prev_spike = spike_peak + time_index
             tt = time.time() - st
             times.append(tt)
             print('Found %d spikes on chan %d in %f s' % (len(chan_spikes), chan_count, tt))
-            tc = ThresholdCrossings(chan_spikes, self.home_dir, chan_count, threshold*self.get_conversion_factor())
+            tc = ThresholdCrossings(chan_spikes, self.home_dir, chan_count, threshold*self.conversion_factor)
             tcs.append(tc)
             chan_count += 1
         self._set_threshold_crossings(tcs)
         print('Threshold crossings found and set!')
-
-    def get_tcs(self):
-        return self.threshold_crossings
 
     def set_tc_amplitudes(self, channel_num, *, amplitude_type='minmax', pre_spike_window=1, post_spike_window=2):
         '''
@@ -92,35 +89,35 @@ class Threshold_Recording(recording.Recording):
         post_spike_window=2 - The window (in ms) to take after the spike peak
         '''
         try:
-            assert len(self.get_tcs()) > 0
+            assert len(self.threshold_crossings) > 0
         except(AssertionError):
             raise RuntimeError('Set Tcs before finding their amplitudes')
 
         # Get all the variables
-        tc = self.get_tcs()[channel_num]
-        spike_times = tc.get_spike_times()
-        data = self.get_data()
-        cf = self.get_conversion_factor()
+        tc = self.threshold_crossings[channel_num]
+        spike_times = tc.spike_times
+        data = self.data
+        cf = self.conversion_factor
 
         all_amps = []
         for i in spike_times:
             pre_spike = int(i - pre_spike_window/1000)  # Convert to seconds, which the tcs are in
             post_spike = int(i + post_spike_window/1000)
-            spike = data[channel_num, pre_spike*self.get_fs():post_spike*self.get_fs()]  # Convert back to samples to access the data
+            spike = data[channel_num, pre_spike*self.fs:post_spike*self.fs]  # Convert back to samples to access the data
 
             # Choose the amplitude type
             if amplitude_type == 'minmax':
                 amplitude = max(spike) - min(spike)
             elif amplitude_type == 'median':
-                amplitude = abs(spike[pre_spike_window*self.get_fs()/1000] - np.median(spike))
+                amplitude = abs(spike[pre_spike_window*self.fs/1000] - np.median(spike))
             elif amplitude_type == 'first':
-                amplitude  = abs(spike[pre_spike_window*self.get_fs()/1000] - spike[0])
+                amplitude  = abs(spike[pre_spike_window*self.fs/1000] - spike[0])
             else:
                 raise ValueError('Incorrect amplitude_type, can be minmax, median, or first')
 
             # Convert it with the conversion factor to microvolts
             all_amps.append(amplitude*cf)
-        tc._set_amplitude(all_amps)
+        tc.set_amplitudes(all_amps)
 
     def set_all_tcs_amplitudes(self, *, amplitude_type='minmax', pre_spike_window=1, post_spike_window=2):
         '''
@@ -139,9 +136,9 @@ class Threshold_Recording(recording.Recording):
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
-        spiking_obj.plot_firing_rate(self.get_rec_length(), ax=ax, bin_size=bin_size)
+        spiking_obj.plot_firing_rate(self.rec_length, ax=ax, bin_size=bin_size)
         if end is None:
-            end = self.get_rec_length()
+            end = self.rec_length
         ax.set_xlim(start, end)
 
     def plot_all_firing_rates_tcs(self, *, bin_size=1, start=0, end=None):
@@ -166,6 +163,9 @@ class Threshold_Recording(recording.Recording):
 
 
     def plot_crossing_heatmap(self, *, bin_size=1, chans='All', scale=None, cmap='plasma'):
+        '''
+        Unfinished
+        '''
         frs = []
         if chans == 'All':
             chans = range(self.get_channel_count())
@@ -189,8 +189,7 @@ def bandpass_data(data, *, lowcut=300, highcut=6000, fs=30000, order=3):
     nyq = 0.5*fs
     low = lowcut/nyq
     high = highcut/nyq
-    sos = signal.butter(3, [low, high], analog=False, btype='band',
-                        output='sos')
+    sos = signal.butter(3, [low, high], analog=False, btype='band', output='sos')
     y = signal.sosfiltfilt(sos, data)
     return y
 

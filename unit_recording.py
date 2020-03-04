@@ -7,11 +7,12 @@ from threshold_recording import Threshold_Recording
 
 class Unit_Recording(Threshold_Recording):
 
-    def __init__(self, home_dir, channel_count, *, fs=30000, dat_name='100_CHs.dat', conversion_factor=0.195):
+    def __init__(self, home_dir, channel_count, *, fs=30000, dat_name='100_CHs.dat', conversion_factor=0.195, sniff_basis=False):
         Threshold_Recording.__init__(self, home_dir, channel_count, fs=fs, dat_name=dat_name, conversion_factor=conversion_factor)
         self.channel_map = np.load(os.path.join(home_dir, 'channel_map.npy'))
         self.channel_positions = np.load(os.path.join(home_dir, 'channel_positions.npy'))
         self.clusters = self._find_clusters()
+        self.sniff_basis = sniff_basis
 
     def _find_clusters(self):
         home_dir = self.get_home_dir()
@@ -56,6 +57,9 @@ class Unit_Recording(Threshold_Recording):
 
     def get_all_clusters(self):
         return self.clusters
+
+    def get_if_sniff_basis(self):
+        return self.sniff_basis
 
     def get_cluster(self, cluster_num):
         cluster = [i for i in self.get_all_clusters() if i.get_cluster_num() == cluster_num]
