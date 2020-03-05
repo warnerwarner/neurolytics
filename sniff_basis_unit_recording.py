@@ -16,7 +16,7 @@ def make_sniff_basis(unit_recording, resp_trace):
         print('Trial starts found!')
         print('Converting to sniff basis')
         trial_starts = unit_recording.trial_starts
-        trial_ends = [i+unit_recording.get_trial_length()*unit_recording.get_fs() for i in trial_starts]
+        trial_ends = [i+unit_recording.trial_length*unit_recording.fs for i in trial_starts]
         trial_ends = np.array(trial_ends)
         if trial_starts is not None:
             trials_sb = []
@@ -39,20 +39,20 @@ def make_sniff_basis(unit_recording, resp_trace):
     else:
         print('No trial starts found')
 
-    clusters = unit_recording.get_all_clusters()
+    clusters = unit_recording.clusters
     clusters_sb = []
     print('Converting clusters to sniff basis')
     for cluster in tqdm(clusters):
         #print('Cluster %d' % cluster.get_cluster_num())
         cluster_sb = make_cluster_sniff_basis(cluster, peaks)
         clusters_sb.append(cluster_sb)
-    unit_recording_sb._set_clusters(clusters_sb)
+    unit_recording_sb.clusters = clusters_sb
     unit_recording.sniff_basis=True
     return unit_recording_sb
 
 
 def make_cluster_sniff_basis(cluster, peaks):
-    spike_times = cluster.get_spike_times()
+    spike_times = cluster.spike_times
     spike_times = np.hstack(spike_times)
     spikes_sb = []
     for i in range(len(peaks) - 1):
@@ -63,5 +63,5 @@ def make_cluster_sniff_basis(cluster, peaks):
         spikes_sb.append(sniff_spikes)
     spikes_sb = np.hstack(spikes_sb)
     clus_sb = deepcopy(cluster)
-    clus_sb._set_spike_times(spikes_sb)
+    clus_sb.spike_times = spikes_sb
     return clus_sb

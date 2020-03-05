@@ -75,7 +75,7 @@ class Threshold_Recording(recording.Recording):
             tc = ThresholdCrossings(chan_spikes, self.home_dir, chan_count, threshold*self.conversion_factor)
             tcs.append(tc)
             chan_count += 1
-        self._set_threshold_crossings(tcs)
+        self.threshold_crossings = tcs
         print('Threshold crossings found and set!')
 
     def set_tc_amplitudes(self, channel_num, *, amplitude_type='minmax', pre_spike_window=1, post_spike_window=2):
@@ -117,7 +117,7 @@ class Threshold_Recording(recording.Recording):
 
             # Convert it with the conversion factor to microvolts
             all_amps.append(amplitude*cf)
-        tc.set_amplitudes(all_amps)
+        tc.amplitudes = all_amps
 
     def set_all_tcs_amplitudes(self, *, amplitude_type='minmax', pre_spike_window=1, post_spike_window=2):
         '''

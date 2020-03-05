@@ -15,20 +15,31 @@ class Unit_Recording(Threshold_Recording):
         self.sniff_basis = sniff_basis
 
     def _find_clusters(self):
-        home_dir = self.get_home_dir()
+        home_dir = self.home_dir
         spike_clusters = np.load(os.path.join(home_dir, 'spike_clusters.npy'))
         spike_templates = np.load(os.path.join(home_dir, 'spike_templates.npy'))
         spike_times = np.load(os.path.join(home_dir, 'spike_times.npy'))
-        channel_map = self.get_channel_map()
+        channel_map = self.channel_map
         templates = np.load(os.path.join(home_dir, 'templates.npy'))
         cluster_tsv = os.path.join(home_dir, 'cluster_group.tsv')
         tsv_read = csv.reader(open(cluster_tsv, 'r'), delimiter='\t')
+        if os.path.isfile(os.path.join(home_dir, 'sniff_locked_spikes.npy')):
+            print('Found sniff spikes')
+            sniff_locked_spikes = np.load(os.path.join(home_dir, 'sniff_locked_spikes.npy'), allow_pickle=True)
+            sniff_cluster_nums = np.load(os.path.join(home_dir, 'sniff_cluster_nums.npy'))
+            sniff_spikes = True
+        else:
+            sniff_spikes = False
         next(tsv_read)
         clusters = []
         for cluster_row in tsv_read:
         # Find the cluster number and label
             cluster_num = int(cluster_row[0])
             c_label = cluster_row[1]
+            if sniff_spikes:
+                c_sniff_spikes = sniff_locked_spikes[(sniff_cluster_nums == cluster_num)]
+            else:
+                c_sniff_spikes = None
 
             # Find the times and templates
             c_times = spike_times[(spike_clusters == cluster_num)]
@@ -38,7 +49,8 @@ class Unit_Recording(Threshold_Recording):
             maxes = [max(abs(i)) for i in c_temp.T]
             max_chan = channel_map[np.argmax(maxes)]
             # Create a cluster and add to the ClusterSet
-            cluster = Cluster(cluster_num, c_times, home_dir, c_label, c_temp_index, c_temp, max_chan)
+            cluster = Cluster(cluster_num, c_times, home_dir, c_label, c_temp_index,
+                              c_temp, max_chan, sniff_lock_spikes=c_sniff_spikes[0])
             clusters.append(cluster)
         return clusters
 
@@ -52,29 +64,19 @@ class Unit_Recording(Threshold_Recording):
         except(AssertionError):
             raise TypeError('New cluster must be of a Cluster object')
 
-    def get_clusters(self):
-        return self.clusters
-
-    def get_all_clusters(self):
-        return self.clusters
-
-    def get_if_sniff_basis(self):
-        return self.sniff_basis
-
     def get_cluster(self, cluster_num):
-        cluster = [i for i in self.get_all_clusters() if i.get_cluster_num() == cluster_num]
+        cluster = [i for i in self.clusters if i.cluster_num == cluster_num]
         return cluster[0]
 
     def get_good_clusters(self):
-        clusters = [i for i in self.get_all_clusters() if i.get_label() == 'good']
+        clusters = [i for i in self.clusters if i.label == 'good']
         return clusters
 
     def get_non_noise_clusters(self):
-        clusters = [i for i in self.get_all_clusters() if i.get_label() == 'good' or i.get_label() == 'mua']
+        clusters = [i for i in self.clusters if i.label == 'good' or i.label == 'mua']
         return clusters
 
-    def get_channel_map(self):
-        return self.channel_map
+
 
 if __name__ == '__main__':
     cluster = Cluster([[1], [3], [4]], None, None, None, None, None, None, np.array([[10, 1, 5], [1, 3, 5]]))

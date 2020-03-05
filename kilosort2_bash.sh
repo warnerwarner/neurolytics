@@ -10,6 +10,6 @@
 #SBATCH --mem=100G
 #SBATCH --partition=gpu
 ml matlab
-ml ml CUDA/10.0.130
+ml CUDA/10.0.130
 
 matlab -nodisplay -nosplash -nodesktop -r "run('/home/camp/warnert/working/Recordings/binary_pulses/200303/2020-03-03_19-57-03/kilosort2_master.m');"

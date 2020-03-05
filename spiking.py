@@ -12,9 +12,6 @@ class Spiking():
         self.recording_dir = recording_dir
         self.amplitudes = None
 
-    def set_amplitudes(self, amplitudes):
-        self.amplitudes = amplitudes
-
     def get_firing_rate(self, exp_length, *, bin_size=1):
         ys, xs = np.histogram(self.get_spike_times(), bins=np.arange(0, exp_length, 1))
         return xs[:-1], ys/bin_size
@@ -26,6 +23,7 @@ class Spiking():
         xs, ys = self.get_firing_rate(exp_length, bin_size=bin_size)
         ax.plot(xs, ys)
 
+
 class Cluster(Spiking):
     '''
     Holds information about Kilosorted clusters, a subclass of Spiking
@@ -33,14 +31,15 @@ class Cluster(Spiking):
     Information includes cluster number, spiking times, the recording dir, cluster label and templates
     '''
 
-    def __init__(self, cluster_num, times, recording_dir, label, template_ind, template, max_chan):
+    def __init__(self, cluster_num, times, recording_dir, label, template_ind,
+                 template, max_chan, *, sniff_lock_spikes=None):
         Spiking.__init__(self, times, recording_dir)
         self.cluster_num = cluster_num
         self.label = label
         self.template_ind = template_ind
         self.template = template
         self.max_chan = max_chan
-
+        self.sniff_lock_spikes = sniff_lock_spikes
 
 
 class ThresholdCrossings(Spiking):

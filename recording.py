@@ -25,20 +25,20 @@ class Recording():
         self.dat_name = dat_name
         self.conversion_factor = conversion_factor
         self.data = self._load_dat()
-        self.rec_length = len(self.data[0])/self.get_fs()
+        self.rec_length = len(self.data[0])/self.fs
 
     def _load_dat(self):
         '''
         Load the dat data file in as a memmap
         '''
 
-        data = np.memmap(os.path.join(self.get_home_dir(), self.get_dat_name()), dtype=np.int16)
+        data = np.memmap(os.path.join(self.home_dir, self.dat_name), dtype=np.int16)
         try:
-            assert len(data) % self.get_channel_count() == 0
+            assert len(data) % self.channel_count == 0
         except (AssertionError):
             raise ValueError("Channel count and data length not comptable...")
 
-        data = data.reshape(self.get_channel_count(), int(len(data)/self.get_channel_count()), order='F')
+        data = data.reshape(self.channel_count, int(len(data)/self.channel_count), order='F')
         return data
 
 
