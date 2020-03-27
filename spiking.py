@@ -13,7 +13,7 @@ class Spiking():
         self.amplitudes = None
 
     def get_firing_rate(self, exp_length, *, bin_size=1):
-        ys, xs = np.histogram(self.get_spike_times(), bins=np.arange(0, exp_length, 1))
+        ys, xs = np.histogram(self.spike_times, bins=np.arange(0, exp_length, 1))
         return xs[:-1], ys/bin_size
 
     def plot_firing_rate(self, exp_length, *, ax=None, bin_size=1):
