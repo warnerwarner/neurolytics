@@ -10,7 +10,7 @@ from scipy.signal import find_peaks
 class Correlation_Recording(Unit_Recording):
 
     def __init__(self, home_dir, channel_count, trialbank_loc, *, trial_length=2, trig_chan='100_ADC6.continuous'):
-        Unit_Recording.__init__(self, home_dir, channel_count)
+        Unit_Recording.__init__(self, home_dir, channel_count, trial_length)
         self.trialbank_loc = trialbank_loc
         self.trial_length = trial_length
         self.trig_chan = trig_chan
@@ -27,13 +27,15 @@ class Correlation_Recording(Unit_Recording):
         self._extract_trial_names()
         print('Finding respiration peaks')
         self._find_respiration_peaks()
+        print('Finding sniff subtracted')
+        self._find_all_sniff_lock_avg(self.trial_length*2)
 
     def _extract_trial_names(self):
         trialbank = pickle.Unpickler(open(self.trialbank_loc, 'rb')).load()
         trial_names = [i[-1] for i in trialbank]
-        repeats = len(self.trial_starts)/len(trial_names)
+        repeats = int(len(self.trial_starts)/len(trial_names))
         try:
-            assert len(self.trial_starts) % len(trial_names) != 0
+            assert len(self.trial_starts) % len(trial_names) == 0.0
         except (AssertionError):
             raise ValueError('Length of trial starts is not fully divisible by number of found trial types (%f)' % (len(self.trial_starts) % (len(trial_names))))
 
