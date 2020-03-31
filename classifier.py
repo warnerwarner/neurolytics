@@ -7,6 +7,9 @@ import numpy as np
 import random
 
 class Classifier():
+    '''
+    Classifies responses to different trials using a vairety of classifiers and techniques
+    '''
 
     def __init__(self, *, kernel='linear', scale=None, test_size=1, pre_trial_window=None,
                  post_trial_window=None, bin_size=0.01, C=1000):
@@ -36,33 +39,57 @@ class Classifier():
         self.window_end = None
 
     def make_pca_responses(self, n_components, trial_names, *, baseline=True):
+        '''
+        Creates an array of neural responses to trials in PC space
 
+        Arguments:
+        n_components - The number of components for the PCA
+        trial_names - Names of the trials in the experiment to apply PCA to
+
+        Optional arguments:
+        baseline - Should the responses be baseline subtracted (to remove expected sniff locked activity), default True
+        '''
         pca = PCA(n_components=n_components)
         full_pcad_responses = []
         full_trial_names = []
         trial_responses = []
         all_trial_repeats = []
+
+        # Runs through all the passed trials
+        # Then for each trial runs through each recording
+        # Then runs through each good cluster in each recording
         for trial in trial_names:
             trial_repeats = []
             for recording in self.recordings:
                 for cluster in recording.get_good_clusters():
+                    # Default values for pre/post trial window is None which will set them to 2*trial length
                     binned_trial_response = recording.get_binned_trial_response(trial,
                                                                                 cluster.cluster_num,
                                                                                 post_trial_window=self.post_trial_window,
                                                                                 pre_trial_window=self.pre_trial_window,
                                                                                 bin_size=self.bin_size,
                                                                                 baselined=baseline)
-                    trial_responses.append(binned_trial_response[1])
-                trial_repeats.append(len(recording.get_unique_trial_starts(trial)))
-                self.num_of_units += len(cluster.get_good_clusters())
+                    trial_responses.append(binned_trial_response[1])  # The binned_trial_response is both the x and y values so discard x
+                trial_repeats.append(len(recording.get_unique_trial_starts(trial)))  # Find how many repeats there are of the trial
+
+            # Make sure that the number of repeats are equal across experiments - might change in the future
             assert len(set(trial_repeats)) != 0, 'Length of repeats varies between experiments...'
+            # Add in the length of repeats
             all_trial_repeats.append(trial_repeats[0])
             for i in range(trial_repeats[0]):
                 full_trial_names.append(trial)
+        # Find the number of units
+        self.num_of_units = sum([len(i.get_good_clusters()) for i in self.recordings])
+
+        # Join all the responses together
         joined_response = np.concatenate(trial_responses, axis=0)
+
+        # Apply the pca
         pcad_response = pca.fit_transform(joined_response)
         rearranged_trial = []
         num_of_trials = sum(all_trial_repeats)
+
+        # Rearrange the responses to be in the trial x unit*pcs format
         for i in range(int(len(pcad_response)/num_of_trials)):
             rearranged_trial.append(pcad_response[int(num_of_trials*i):int(num_of_trials*(i+1))].T)
         rearranged_trial = np.concatenate(rearranged_trial).T
@@ -76,7 +103,23 @@ class Classifier():
 
 
     def pca_classifier(self, n_components, trial_names, *, baseline=True, shuffle=False):
-        self.make_pca_responses(n_components, trial_names, baseline=baseline)
+        '''
+        Run a classifier on PCA data
+
+        Arguments:
+        n_components - number of components for the pca
+        trial_names - names of the trials to be analysed
+
+        Optional arguments:
+        baseline - remove the baseline sniff locked activity, default true
+        shuffle - shuffle the labels, default false
+        '''
+
+        # Make the response if not already done so
+        if self.unit_response is None:
+            self.make_pca_responses(n_components, trial_names, baseline=baseline)
+
+        # Should the responses be scaled in anyway
         if self.scale is not None:
             if self.scale == 'standard':
                 scaler = StandardScaler(with_mean=False, with_std=True)
@@ -87,6 +130,8 @@ class Classifier():
                 pcad_response = scaler.fit_transform(self.unit_response)
         else:
             pcad_response = self.unit_response
+
+        # If the test size is < 1 then treated as fraction of trials, and greater treated as number of trials
         if self.test_size < 1:
             test_size = self.test_size
         else:
@@ -107,9 +152,23 @@ class Classifier():
         self.y_test = y_test
 
     def make_unit_response(self, trial_names, *, baseline=True, window_start=None, window_end=None):
+        '''
+        Make a unit response matrix in the form trials x unit*timepoints
+
+        Arguments:
+        trial_names - trials to be used in construction
+        Optional arguments:
+        baseline - should the sniff locked expected activity be subtracted, defualt True
+        window_start - The window start of response, default None
+        window_end - The window end of the response to be considered, default None
+        '''
 
         all_trial_responses = []
         y_var = []
+
+        # Run through all the trials,
+        # then the recordings
+        # then the clusters in each recording
         for trial in trial_names:
             trial_responses = []
             for recording in self.recordings:
@@ -121,13 +180,12 @@ class Classifier():
                                                                                 bin_size=self.bin_size,
                                                                                 baselined=baseline)
                     trial_responses.append(binned_trial_response[1])
-                    if self.pre_trial_window is None:
+                    if self.pre_trial_window is None:  # Set to the default used in the get_binned_trial_response
                         self.pre_trial_window = recording.trial_length*2
             all_trial_responses.append(trial_responses)
             for i in range(len(binned_trial_response[1])):
                 y_var.append(trial)
         self.num_of_units = sum([len(i.get_good_clusters()) for i in self.recordings])
-        print(self.num_of_units)
         trial_responses = np.concatenate(np.concatenate(all_trial_responses, axis=1), axis=1)
         self.unit_response = trial_responses
         self.y_var = y_var

@@ -8,6 +8,9 @@ import os
 
 
 class Binary_recording(Unit_Recording):
+    '''
+    Contains functions and data relevent to binary_recordings, inherets from Unit_Recording
+    '''
 
     def __init__(self, home_dir, channel_count, trial_names, *, trig_chan='100_ADC6.continuous', trial_length=0.12):
         Unit_Recording.__init__(self, home_dir, channel_count)
@@ -19,6 +22,9 @@ class Binary_recording(Unit_Recording):
         self.resp_peaks = None
 
     def set(self, *, resp_channel='100_ADC1.continuous', sniff_avg=True):
+        '''
+        Sets all the non saved variables
+        '''
         print('Finding trial names...')
         self._extract_trial_names()
         print('Finding trial starts...')
@@ -29,6 +35,9 @@ class Binary_recording(Unit_Recording):
             self._find_sniff_avg(1)
 
     def _extract_trial_names(self):
+        '''
+        Find the trial names of experiments from the saved trial file
+        '''
         trial_names = self.trial_names
         if isinstance(trial_names, str):
             print('Extracting trial names')
