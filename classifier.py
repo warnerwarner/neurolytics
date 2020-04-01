@@ -232,4 +232,5 @@ class Classifier():
             if i == j:
                 correct += 1
         self.accuracy = correct/len(self.y_test)
-        print('Accuracy is', self.accuracy)
+        return self.accuracy
+        #print('Accuracy is', self.accuracy)
