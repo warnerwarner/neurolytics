@@ -190,7 +190,7 @@ class Unit_Recording(Threshold_Recording):
         cluster_trial_spikes = []
         sniff_basis = self.sniff_basis
         if pre_trial_window is None:
-            pre_trial_window = -2*self.trial_length
+            pre_trial_window = 2*self.trial_length
         if post_trial_window is None:
             post_trial_window = 2*self.trial_length
         for start in starts:

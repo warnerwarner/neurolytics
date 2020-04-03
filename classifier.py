@@ -151,7 +151,7 @@ class Classifier():
         self.y_train = y_train
         self.y_test = y_test
 
-    def make_unit_response(self, trial_names, *, baseline=True, window_start=None, window_end=None):
+    def make_unit_response(self, trial_names, *, baseline=False, window_start=None, window_end=None, return_resp=False):
         '''
         Make a unit response matrix in the form trials x unit*timepoints
 
@@ -189,8 +189,19 @@ class Classifier():
         trial_responses = np.concatenate(np.concatenate(all_trial_responses, axis=1), axis=1)
         self.unit_response = trial_responses
         self.y_var = y_var
+        if return_resp:
+            return trial_responses
 
-    def window_classifier(self, trial_names, window_start, window_end, *, baseline=True, shuffle=False):
+    def make_difference_response(self, trial_names_odour, trial_names_blanks, *, baseline=False, window_start=None, window_end=None):
+        '''
+        Sets the unit_response to be the difference between odour and blank trials - currently uses the difference between the odour and a random blank, not the average
+        '''
+        odour_response = self.make_unit_response(trial_names_odour, baaseline=baseline, window_start=window_start, window_end=window_end)
+        blank_response = self.make_unit_response(trial_names_blanks, baaseline=baseline, window_start=window_start, window_end=window_end)
+        difference = odour_response - blank_response
+        self.unit_response = difference
+
+    def window_classifier(self, trial_names, window_start, window_end, *, baseline=False, shuffle=False):
         if self.unit_response is None:
             self.make_unit_response(trial_names, baseline=baseline)
 
@@ -225,6 +236,7 @@ class Classifier():
         self.window_start = window_start
         self.window_end = window_end
 
+
     def find_accuracy(self):
         assert self.svm is not None, 'Please classify first'
         correct = 0
@@ -233,4 +245,3 @@ class Classifier():
                 correct += 1
         self.accuracy = correct/len(self.y_test)
         return self.accuracy
-        #print('Accuracy is', self.accuracy)
