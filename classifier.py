@@ -196,12 +196,13 @@ class Classifier():
         '''
         Sets the unit_response to be the difference between odour and blank trials - currently uses the difference between the odour and a random blank, not the average
         '''
-        odour_response = self.make_unit_response(trial_names_odour, baaseline=baseline, window_start=window_start, window_end=window_end)
-        blank_response = self.make_unit_response(trial_names_blanks, baaseline=baseline, window_start=window_start, window_end=window_end)
+        odour_response = self.make_unit_response(trial_names_odour, baseline=baseline, window_start=window_start, window_end=window_end, return_resp=True)
+        blank_response = self.make_unit_response(trial_names_blanks, baseline=baseline, window_start=window_start, window_end=window_end, return_resp=True)
         difference = odour_response - blank_response
         self.unit_response = difference
 
-    def window_classifier(self, trial_names, window_start, window_end, *, baseline=False, shuffle=False):
+
+    def window_classifier(self, trial_names, window_start, window_end, *, baseline=False, shuffle=False, sub_units=None):
         if self.unit_response is None:
             self.make_unit_response(trial_names, baseline=baseline)
 
@@ -214,6 +215,12 @@ class Classifier():
             window_unit_response.append(self.unit_response[:, bin_start+num_of_bins*i:bin_end+num_of_bins*i])
 
         window_unit_response = np.sum(window_unit_response, axis=2).T
+
+        # Runs if sub units is set to an int, only uses a random subsection of units
+        if sub_units is not None:
+            assert type(sub_units) == int, 'sub_units needs to be int'
+            np.random.shuffle(window_unit_response.T)
+            window_unit_response = window_unit_response[:, :sub_units]
 
         if self.test_size < 1:
             test_size = self.test_size
