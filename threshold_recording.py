@@ -5,6 +5,7 @@ import openephys as oe
 from scipy import signal
 import matplotlib.pyplot as plt
 import time
+import os
 import seaborn as sns
 from spiking import ThresholdCrossings
 
@@ -18,10 +19,35 @@ class Threshold_Recording(recording.Recording):
         recording.Recording.__init__(self, home_dir, channel_count, fs=fs, dat_name=dat_name, conversion_factor=conversion_factor)
         self.threshold_crossings = []
 
-    def _set_threshold_crossings(self, tcs):
-        self.threshold_crossings = tcs
+    def set(self, *, tc_time_name='threshold_crossings.npy', tc_amp_name='threshold_amplitudes.npy',
+            tc_chan_name='threshold_channel.npy', threshold_name='channel_threshold_indv.npy'):
+        if os.path.isfile(os.path.join(self.home_dir, tc_time_name)):
+            print('Found tc times!')
+            tcs = np.load(os.path.join(self.home_dir, tc_time_name))
+            chans = np.load(os.path.join(self.home_dir, tc_chan_name))
+            thresholds = np.load(os.path.join(self.home_dir, threshold_name))
+            if os.path.isfile(os.path.join(self.home_dir, tc_amp_name)):
+                print('Found tc amps!')
+                amps = np.load(os.path.join(self.home_dir, tc_amp_name))
+            else:
+                print('Found no amps')
+                amps = None
+            for chan in range(self.channel_count):
+                chan_tcs = tcs[(chans == chan)]
+                threshold = thresholds[chan]
+                tc = ThresholdCrossings(chan_tcs, self.home_dir, self.channel_count, threshold*self.conversion_factor)
+                if amps is not None:
+                    tc.amplitudes = amps[(chans == chan)]
+                self.threshold_crossings.append(tc)
+        else:
+            print('No previous threshold crossing files found, finding thresholds from scratch')
+            self.set_threshold_crossings()
+        print('Threshold crossings found and set!')
 
-    def set_threshold_crossings(self, *, pol='neg', lim=4, inter_spike_window=1, method='quian'):
+
+
+
+    def set_threshold_crossings(self, *, pol='neg', lim=4, inter_spike_window=1, method='quian', bp_indiv_chans=False):
         '''
         Set threshold crossings using the RecordingBase's data then creates ThresholdCrossing objects
 
@@ -30,14 +56,18 @@ class Threshold_Recording(recording.Recording):
         inter_spike_window=1 - the window in milliseconds between concurrent spikes, spike between this are lost ¯|_(ツ)_|¯
         method=quian - method to calculate the threshold, can be quain (median/0.6745 of data), std, or rms
         '''
-
+        self.threshold_crossings = []
         print('Bandpassing data, this make take some time...')
-        bp_data = bandpass_data(self.data)
+        bp_data = bandpass_data(self.data, indiv_chans=bp_indiv_chans)
         print('Threshold set by %s' % method)
         if method == 'std':
             thresholds = np.std(bp_data, axis=1)
         elif method == 'quian':
-            thresholds = np.median(abs(bp_data)/0.6745, axis=1)
+            if bp_indiv_chans:
+                thresholds = []
+                for chan in bp_data:
+                    thresholds.append(np.median(abs(chan)/0.6745))
+                thresholds = np.array(thresholds)
         elif method == 'rms':
             thresholds = np.sqrt(np.mean(bp_data**2, axis=1))
         else:
@@ -58,25 +88,38 @@ class Threshold_Recording(recording.Recording):
         tcs = []
         chan_count = 0
         times = []
+        all_spikes = []
+        all_thresholds = []
+        all_chans = []
         for chan, threshold in zip(bp_data, thresholds):
             print('Finding spikes on chan %d...' % chan_count)
             chan_spikes = []
+            chan_chans = []
             st = time.time()
-            prev_spike = -isw
+            prev_spike = 0
             for time_index, val in enumerate(chan):
                 if val > lim*threshold and time_index - prev_spike > isw:
                     spike_snip = chan[time_index:int(time_index+isw)]
                     spike_peak = np.argmax(spike_snip)
                     chan_spikes.append((time_index+spike_peak)/self.fs)  # Set it in seconds
                     prev_spike = spike_peak + time_index
+                    chan_chans.append(chan_count)
             tt = time.time() - st
             times.append(tt)
             print('Found %d spikes on chan %d in %f s' % (len(chan_spikes), chan_count, tt))
             tc = ThresholdCrossings(chan_spikes, self.home_dir, chan_count, threshold*self.conversion_factor)
             tcs.append(tc)
             chan_count += 1
+            all_spikes.append(chan_spikes)
+            all_chans.append(chan_chans)
+            all_thresholds.append(threshold)
+        all_chans = np.concatenate(all_chans)
+        all_spikes = np.concatenate(all_spikes)
+        #all_thresholds = np.concatenate(all_thresholds)
+        np.save(os.path.join(self.home_dir, 'threshold_crossings.npy'), all_spikes)
+        np.save(os.path.join(self.home_dir, 'threshold_channel.npy'), all_chans)
+        np.save(os.path.join(self.home_dir, 'channel_threshold_indv.npy'), all_thresholds)
         self.threshold_crossings = tcs
-        print('Threshold crossings found and set!')
 
     def set_tc_amplitudes(self, channel_num, *, amplitude_type='minmax', pre_spike_window=1, post_spike_window=2):
         '''
@@ -101,11 +144,16 @@ class Threshold_Recording(recording.Recording):
 
         all_amps = []
         for i in spike_times:
-            pre_spike = int(i - pre_spike_window/1000)  # Convert to seconds, which the tcs are in
-            post_spike = int(i + post_spike_window/1000)
-            spike = data[channel_num, pre_spike*self.fs:post_spike*self.fs]  # Convert back to samples to access the data
-
+            pre_spike = i - pre_spike_window/1000  # Convert to seconds, which the tcs are in
+            post_spike = i + post_spike_window/1000
+            #print(pre_spike*self.fs, post_spike*self.fs)
+            spike = data[channel_num, int(pre_spike*self.fs):int(post_spike*self.fs)]  # Convert back to samples to access the data
+            spike = spike.astype(np.int32)
+            #print(pre_spike*self.fs, post_spike*self.fs)
+            #print(spike)
             # Choose the amplitude type
+            if len(spike) == 0:
+                print(pre_spike, post_spike)
             if amplitude_type == 'minmax':
                 amplitude = max(spike) - min(spike)
             elif amplitude_type == 'median':
@@ -129,8 +177,14 @@ class Threshold_Recording(recording.Recording):
         post_spike_window=2 - The window (in ms) to take after the spike peak
         '''
         print('Finding amplitudes with %s' % amplitude_type)
-        for chan_num in range(self.channel_count()):
-            self.set_tc_amplitudes(chan_num, amplitude_type, pre_spike_window, post_spike_window)
+        for chan_num in range(self.channel_count):
+            print('Finding amplitudes for channel %d' % chan_num)
+            self.set_tc_amplitudes(chan_num, amplitude_type=amplitude_type,
+                                   pre_spike_window=pre_spike_window,
+                                   post_spike_window=post_spike_window)
+
+        all_amps = [i.amplitudes for i in self.threshold_crossings]
+        np.save(os.path.join(self.home_dir, 'threshold_amplitudes.npy'), np.concatenate(all_amps))
 
     def plot_firing_rate(self, spiking_obj, *, ax=None, bin_size=1, start=0, end=None):
         if ax is None:
@@ -146,8 +200,8 @@ class Threshold_Recording(recording.Recording):
         Unfinished
         '''
         #fig = plt.figure(figsize=(10, 5))
-        fig = plt.figure(figsize=(self.get_channel_count()/2, self.get_channel_count()))
-        tcs = self.get_tcs()
+        fig = plt.figure(figsize=(self.channel_count/2, self.channel_count))
+        tcs = self.threshold_crossings
         ax1 = fig.add_subplot(111)
         #ax.plot([0, 0], [0, 100])
         ax1.grid(True)
@@ -185,12 +239,22 @@ class Threshold_Recording(recording.Recording):
 
 
 
-def bandpass_data(data, *, lowcut=300, highcut=6000, fs=30000, order=3):
+def bandpass_data(data, *, lowcut=300, highcut=6000, fs=30000, order=3, indiv_chans=False):
     nyq = 0.5*fs
     low = lowcut/nyq
     high = highcut/nyq
     sos = signal.butter(3, [low, high], analog=False, btype='band', output='sos')
-    y = signal.sosfiltfilt(sos, data)
+    if indiv_chans:
+        print('Bandpassing individual channels')
+        bp_data = []
+        for index, i in enumerate(data):
+            st = time.time()
+            y = signal.sosfiltfilt(sos, i)
+            bp_data.append(y)
+            print('Bandpassed channel %d out of %d in' % (index, len(data)), time.time()-st)
+        y = np.array(bp_data)
+    else:
+        y = signal.sosfiltfilt(sos, data)
     return y
 
 
