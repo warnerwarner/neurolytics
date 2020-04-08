@@ -120,6 +120,20 @@ class Classifier():
             self.make_pca_responses(n_components, trial_names, baseline=baseline)
 
         # Should the responses be scaled in anyway
+
+
+        # If the test size is < 1 then treated as fraction of trials, and greater treated as number of trials
+        if self.test_size < 1:
+            test_size = self.test_size
+        else:
+            test_size = self.test_size/len(self.unit_response)
+
+        if shuffle:
+            self.shuffle = True
+            random.shuffle(self.y_var)
+
+        X_train, X_test, y_train, y_test = train_test_split(self.unit_response, self.y_var, test_size=test_size)
+
         if self.scale is not None:
             if self.scale == 'standard':
                 scaler = StandardScaler(with_mean=False, with_std=True)
@@ -127,21 +141,9 @@ class Classifier():
                 scaler = MinMaxScaler()
             else:
                 raise ValueError('Scalar type incorrect, must be standard, minmax, or None')
-                pcad_response = scaler.fit_transform(self.unit_response)
-        else:
-            pcad_response = self.unit_response
+            X_train = scaler.fit_transform(X_train)
+            X_test = scaler.transform(X_test)
 
-        # If the test size is < 1 then treated as fraction of trials, and greater treated as number of trials
-        if self.test_size < 1:
-            test_size = self.test_size
-        else:
-            test_size = self.test_size/len(pcad_response)
-
-        if shuffle:
-            self.shuffle = True
-            random.shuffle(self.y_var)
-
-        X_train, X_test, y_train, y_test = train_test_split(pcad_response, self.y_var, test_size=test_size)
 
         svm = SVC(C=self.C, kernel=self.kernel)
         svm.fit(X_train, y_train)
@@ -231,7 +233,18 @@ class Classifier():
             self.shuffle = True
             random.shuffle(self.y_var)
 
+
         X_train, X_test, y_train, y_test = train_test_split(window_unit_response, self.y_var, test_size=test_size)
+
+        if self.scale is not None:
+            if self.scale == 'standard':
+                scaler = StandardScaler(with_mean=False, with_std=True)
+            elif self.scale == 'minmax':
+                scaler = MinMaxScaler()
+            else:
+                raise ValueError('Scalar type incorrect, must be standard, minmax, or None')
+            X_train = scaler.fit_transform(X_train)
+            X_test = scaler.transform(X_test)
 
         svm = SVC(C=self.C, kernel=self.kernel)
         svm.fit(X_train, y_train)
