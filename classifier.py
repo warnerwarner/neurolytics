@@ -1,7 +1,7 @@
 from unit_recording import Unit_Recording
 from sklearn.decomposition import PCA
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
-from sklearn.svm import SVC
+from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
+from sklearn.svm import LinearSVC
 from sklearn.model_selection import train_test_split
 import numpy as np
 import random
@@ -11,9 +11,8 @@ class Classifier():
     Classifies responses to different trials using a vairety of classifiers and techniques
     '''
 
-    def __init__(self, *, kernel='linear', scale=None, test_size=1, pre_trial_window=None,
+    def __init__(self, *, scale=None, test_size=1, pre_trial_window=None,
                  post_trial_window=None, bin_size=0.01, C=1000):
-        self.kernel = kernel
         self.scale = scale
         self.type = None
         self.varience = 1
@@ -145,7 +144,7 @@ class Classifier():
             X_test = scaler.transform(X_test)
 
 
-        svm = SVC(C=self.C, kernel=self.kernel)
+        svm = LinearSVC(C=self.C)
         svm.fit(X_train, y_train)
         self.svm = svm
         self.X_train = X_train
@@ -198,8 +197,8 @@ class Classifier():
         '''
         Sets the unit_response to be the difference between odour and blank trials - currently uses the difference between the odour and a random blank, not the average
         '''
-        odour_response = self.make_unit_response(trial_names_odour, baseline=baseline, window_start=window_start, window_end=window_end, return_resp=True)
         blank_response = self.make_unit_response(trial_names_blanks, baseline=baseline, window_start=window_start, window_end=window_end, return_resp=True)
+        odour_response = self.make_unit_response(trial_names_odour, baseline=baseline, window_start=window_start, window_end=window_end, return_resp=True)
         difference = odour_response - blank_response
         self.unit_response = difference
 
@@ -238,15 +237,17 @@ class Classifier():
 
         if self.scale is not None:
             if self.scale == 'standard':
-                scaler = StandardScaler(with_mean=False, with_std=True)
+                scaler = StandardScaler()
             elif self.scale == 'minmax':
                 scaler = MinMaxScaler()
+            elif self.scale == 'robust':
+                scaler = RobustScaler()
             else:
                 raise ValueError('Scalar type incorrect, must be standard, minmax, or None')
             X_train = scaler.fit_transform(X_train)
             X_test = scaler.transform(X_test)
 
-        svm = SVC(C=self.C, kernel=self.kernel)
+        svm = LinearSVC(C=self.C)
         svm.fit(X_train, y_train)
         self.X_train = X_train
         self.X_test = X_test

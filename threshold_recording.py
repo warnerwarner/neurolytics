@@ -21,6 +21,7 @@ class Threshold_Recording(recording.Recording):
 
     def set(self, *, tc_time_name='threshold_crossings.npy', tc_amp_name='threshold_amplitudes.npy',
             tc_chan_name='threshold_channel.npy', threshold_name='channel_threshold_indv.npy'):
+        self.threshold_crossings = []
         if os.path.isfile(os.path.join(self.home_dir, tc_time_name)):
             print('Found tc times!')
             tcs = np.load(os.path.join(self.home_dir, tc_time_name))
