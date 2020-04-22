@@ -10,7 +10,7 @@ from scipy.signal import find_peaks
 
 class Unit_Recording(Threshold_Recording):
 
-    def __init__(self, home_dir, channel_count, trial_length, *, fs=30000, dat_name='100_CHs.dat', conversion_factor=0.195,  sniff_basis=False):
+    def __init__(self, home_dir, channel_count, trial_length, *, fs=30000, dat_name='100_CHs.dat', conversion_factor=0.195,  sniff_basis=False, sniff_locked=False):
         Threshold_Recording.__init__(self, home_dir, channel_count, fs=fs, dat_name=dat_name, conversion_factor=conversion_factor)
         self.channel_map = np.load(os.path.join(home_dir, 'channel_map.npy'))
         self.channel_positions = np.load(os.path.join(home_dir, 'channel_positions.npy'))

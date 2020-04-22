@@ -23,6 +23,9 @@ class Spiking():
         xs, ys = self.get_firing_rate(exp_length, bin_size=bin_size)
         ax.plot(xs, ys)
 
+    def get_correlogram(self, *, bin_size=1, window_size=50):
+        for i
+
 
 class Cluster(Spiking):
     '''
@@ -49,7 +52,8 @@ class ThresholdCrossings(Spiking):
     Contains the spike times, recording directory, the channel number in the orignal recording, and the threshold used
     '''
 
-    def __init__(self, times, recording_dir, channel_num, threshold):
+    def __init__(self, times, recording_dir, channel_num, threshold, *, spike_thresholds=None):
         Spiking.__init__(self, times, recording_dir)
         self.channel_num = channel_num
         self.threshold = threshold
+        self.spike_thresholds = spike_thresholds
