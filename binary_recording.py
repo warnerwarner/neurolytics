@@ -27,12 +27,6 @@ class Binary_recording(Unit_Recording):
         print('Finding trial names...')
         self._extract_trial_names()
         super().set(1)
-        # print('Finding trial starts...')
-        # self._find_trial_starts()
-        # print('Finding respiration peaks...')
-        # self._find_respiration_peaks(resp_channel=resp_channel)
-        # if sniff_avg==True:
-        #     self._find_sniff_avg(1)
 
     def _extract_trial_names(self):
         '''
@@ -48,4 +42,3 @@ class Binary_recording(Unit_Recording):
                 print('Found %d trials in trial name file' % len(trial_lines))
         else:
             print('trials are already trials')
-        #print(len(trial_lines))
