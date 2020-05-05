@@ -9,8 +9,8 @@ from scipy.signal import find_peaks
 
 class Correlation_Recording(Unit_Recording):
 
-    def __init__(self, home_dir, channel_count, trialbank_loc, *, trial_length=2, trig_chan='100_ADC6.continuous'):
-        Unit_Recording.__init__(self, home_dir, channel_count, trial_length)
+    def __init__(self, home_dir, channel_count, trialbank_loc, *, trial_length=2, trig_chan='100_ADC6.continuous', **kwargs):
+        Unit_Recording.__init__(self, home_dir, channel_count, trial_length, **kwargs)
         self.trialbank_loc = trialbank_loc
         self.trial_length = trial_length
         self.trig_chan = trig_chan

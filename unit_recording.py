@@ -82,9 +82,9 @@ class Unit_Recording(Threshold_Recording):
 
     def set(self,  pre_trial_window, *, resp_channel='100_ADC1.continuous'):
         print('Finding trial starts')
-        self._find_trial_starts(self.trial_length)
+        self._find_trial_starts()
         print('Finding respiration peaks')
-        self._find_respiration_peaks(resp_channel)
+        self._find_respiration_peaks(resp_channel=resp_channel)
         print('Finding sniff locked avgs')
         self._find_all_sniff_lock_avg(pre_trial_window)
 

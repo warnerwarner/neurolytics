@@ -13,10 +13,9 @@ class Binary_recording(Unit_Recording):
     '''
 
     def __init__(self, home_dir, channel_count, trial_names, *, trig_chan='100_ADC6.continuous', trial_length=0.12):
-        Unit_Recording.__init__(self, home_dir, channel_count)
+        Unit_Recording.__init__(self, home_dir, channel_count, trial_length)
         self.trig_chan = trig_chan
         self.trial_names = trial_names
-        self.trial_length = trial_length
         self.trial_starts = None
         self.trial_ends = None
         self.resp_peaks = None
@@ -27,12 +26,13 @@ class Binary_recording(Unit_Recording):
         '''
         print('Finding trial names...')
         self._extract_trial_names()
-        print('Finding trial starts...')
-        self._find_trial_starts()
-        print('Finding respiration peaks...')
-        self._find_respiration_peaks(resp_channel=resp_channel)
-        if sniff_avg==True:
-            self._find_sniff_avg(1)
+        super().set(1)
+        # print('Finding trial starts...')
+        # self._find_trial_starts()
+        # print('Finding respiration peaks...')
+        # self._find_respiration_peaks(resp_channel=resp_channel)
+        # if sniff_avg==True:
+        #     self._find_sniff_avg(1)
 
     def _extract_trial_names(self):
         '''
