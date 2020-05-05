@@ -23,8 +23,6 @@ class Spiking():
         xs, ys = self.get_firing_rate(exp_length, bin_size=bin_size)
         ax.plot(xs, ys)
 
-    def get_correlogram(self, *, bin_size=1, window_size=50):
-        for i
 
 
 class Cluster(Spiking):

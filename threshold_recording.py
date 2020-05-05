@@ -8,6 +8,8 @@ import time
 import os
 import seaborn as sns
 from spiking import ThresholdCrossings
+from copy import deepcopy
+from tqdm import tqdm
 
 
 class Threshold_Recording(recording.Recording):
@@ -18,6 +20,9 @@ class Threshold_Recording(recording.Recording):
     def __init__(self, home_dir, channel_count, *, fs=30000, dat_name='100_CHs.dat', conversion_factor=0.195):
         recording.Recording.__init__(self, home_dir, channel_count, fs=fs, dat_name=dat_name, conversion_factor=conversion_factor)
         self.threshold_crossings = []
+        self.unique_spikes = []
+        self.unique_spikes_window = None
+        self.unique_spikes_chans = []
 
     def set(self, *, find_amps=True, tc_time_name='threshold_crossings.npy', tc_amp_name='threshold_amplitudes.npy',
             tc_chan_name='threshold_channel.npy', threshold_name='channel_threshold_indv.npy',
@@ -38,7 +43,7 @@ class Threshold_Recording(recording.Recording):
                     self.set_all_tcs_amplitudes(*kwargs)
             if os.path.isfile(os.path.join(self.home_dir, tc_spike_threshold_name)):
                 print('Found spike thresholds!')
-                spike_thresholds = np.load(os.path.join(self.home_dir), tc_spike_threshold_name)
+                spike_thresholds = np.load(os.path.join(self.home_dir, tc_spike_threshold_name))
             else:
                 spike_thresholds = None
             for chan in range(self.channel_count):
@@ -140,7 +145,8 @@ class Threshold_Recording(recording.Recording):
             all_spike_thresholds.append(chan_spike_threshold)
         all_chans = np.concatenate(all_chans)
         all_spikes = np.concatenate(all_spikes)
-        #all_thresholds = np.concatenate(all_thresholds)
+        all_spike_thresholds = np.concatenate(all_spike_thresholds)
+        # all_thresholds = np.concatenate(all_thresholds)
         np.save(os.path.join(self.home_dir, 'threshold_crossings.npy'), all_spikes)
         np.save(os.path.join(self.home_dir, 'threshold_channel.npy'), all_chans)
         np.save(os.path.join(self.home_dir, 'channel_threshold_indv.npy'), all_thresholds)
@@ -256,7 +262,52 @@ class Threshold_Recording(recording.Recording):
 
         return spikes
 
+    def find_unique_spikes(self, *, isw=30, start_time=0, end_time=None,
+                           chan_spike_matrix=True, out_dir=None,
+                           unique_spikes_name='unique_spike_times.npy',
+                           unique_channel_name='unique_spike_channels.npy'):
+        unique_spike_times = deepcopy(self.threshold_crossings[0].spike_times)
 
+        start_time = int(start_time*self.fs)
+        if end_time is None:
+            end_time = int(self.rec_length*self.fs)
+        else:
+            end_time = int(end_time*self.fs)
+
+        unique_spike_times = unique_spike_times[(unique_spike_times >= start_time) & (unique_spike_times < end_time)]
+
+        chan_spikes = np.zeros((len(unique_spike_times), self.channel_count))
+        chan_spikes[:, 0] = 1
+        print('Unique spikes found:%d' % len(unique_spike_times))
+
+        for chan_index, chan in enumerate(self.threshold_crossings[1:]):
+            cut_spikes = chan.spike_times[(chan.spike_times >= start_time) & (chan.spike_times < end_time)]
+            for spike in tqdm(cut_spikes):
+                insert_index = np.searchsorted(unique_spike_times, spike, side='left')
+                if insert_index != 0:
+                    prev_dist = spike - unique_spike_times[insert_index -1]
+                else:
+                    prev_dist = np.inf
+
+                if insert_index != len(unique_spike_times):
+                    next_dist = unique_spike_times[insert_index] - spike
+                else:
+                    next_dist = np.inf
+                if next_dist >= isw and prev_dist >= isw:
+                    unique_spike_times = np.insert(unique_spike_times, insert_index, spike)
+                    chan_binary = np.zeros(self.channel_count)
+                    chan_binary[chan_index+1] = 1
+                    chan_spikes = np.insert(chan_spikes, insert_index, chan_binary, axis=0)
+                else:
+                    chan_spikes[insert_index-1][chan_index+1] = 1
+            print('Searched %d, found %d' % (chan_index+2, len(unique_spike_times)))
+        self.unique_spikes = unique_spike_times
+        self.unique_spikes_chans = chan_spikes
+        self.unique_spikes_window = isw/self.fs*1000
+        if out_dir is None:
+            out_dir = self.home_dir
+        np.save(os.path.join(out_dir, str(start_time)+'_'+str(end_time)+unique_spikes_name), unique_spike_times)
+        np.save(os.path.join(out_dir, str(start_time)+'_'+str(end_time)+unique_channel_name), chan_spikes)
 
 
 
@@ -327,15 +378,28 @@ def bandpass_data(data, *, lowcut=300, highcut=6000, fs=30000, order=3, indiv_ch
     else:
         return bp_data
 
+
 def preprocess_data(data):
     median_data = np.median(data, axis=0)
     referenced_data = data - median_data
+    median_data = None
     print('CARed data')
-    covariance_matrix = np.cov(referenced_data)
-    U,S,V = np.linalg.svd(covariance_matrix)
+    covariance_matrix = []
+    for i in range(len(data)):
+        row_cov = []
+        for j in range(len(data)):
+            row_cov.append(np.cov(referenced_data[i], referenced_data[j])[0, 1])
+        covariance_matrix.append(row_cov)
+    covariance_matrix = np.array(covariance_matrix)
+    U, S, V = np.linalg.svd(covariance_matrix)
     whitening_const = 1e-5
     print('Found covariance_matrix')
     wzca = np.dot(U, np.dot(np.diag(1.0/np.sqrt(S + whitening_const)), V))
+    covariance_matrix = None
+    row_cov = None
+    U = None
+    S = None
+    V = None
     whitened_data = np.dot(wzca, referenced_data)
     print('Whitened data')
     return whitened_data
