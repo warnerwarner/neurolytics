@@ -5,13 +5,17 @@ from sklearn.svm import LinearSVC
 from sklearn.model_selection import train_test_split
 import numpy as np
 import random
+from sklearn.utils.testing import ignore_warnings
+from sklearn.exceptions import ConvergenceWarning
+import warnings
+warnings.filterwarnings('ignore', category=ConvergenceWarning)
 
 class Classifier():
     '''
     Classifies responses to different trials using a vairety of classifiers and techniques
     '''
 
-    def __init__(self, *, scale=None, test_size=1, pre_trial_window=None,
+    def __init__(self, *, scale='standard', test_size=1, pre_trial_window=None,
                  post_trial_window=None, bin_size=0.01, C=1000):
         self.scale = scale
         self.type = None
@@ -91,9 +95,7 @@ class Classifier():
         # Rearrange the responses to be in the trial x unit*pcs format
         for i in range(int(len(pcad_response)/num_of_trials)):
             rearranged_trial.append(pcad_response[int(num_of_trials*i):int(num_of_trials*(i+1))].T)
-        rearranged_trial = np.concatenate(rearranged_trial).T
-        full_pcad_responses.append(rearranged_trial)
-        full_pcad_responses = np.concatenate(full_pcad_responses, axis=0)
+        full_pcad_responses = np.concatenate(rearranged_trial).T
 
         self.unit_response = full_pcad_responses
         self.y_var = full_trial_names
