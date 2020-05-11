@@ -220,6 +220,24 @@ class Unit_Recording(Threshold_Recording):
         return all_cluster_responses
 
 
+    def get_all_binned_trial_response(self, trial_name, *, only_good=True, pre_trial_window=None, post_trial_window=None, bin_size=0.01, baselined=False):
+        if only_good:
+            clusters = self.get_good_clusters()
+        else:
+            clusters = self.get_non_noise_clusters()
+
+        all_cluster_responses = [self.get_binned_trial_response(trial_name,
+                                                                i.cluster_num,
+                                                                pre_trial_window=pre_trial_window,
+                                                                post_trial_window=post_trial_window,
+                                                                bin_size=bin_size,
+                                                                baselined=baselined)[1] for i in clusters]
+        xs, i = self.get_binned_trial_response(trial_name, clusters[0].cluster_num, pre_trial_window=pre_trial_window,
+                                               post_trial_window=post_trial_window, bin_size=bin_size, baselined=False)
+        return xs, all_cluster_responses
+
+
+
 
     def get_binned_trial_response(self, trial_name, cluster_num, *, pre_trial_window=None, post_trial_window=None, real_time=True, bin_size=0.01, baselined=True):
 
@@ -252,14 +270,14 @@ class Unit_Recording(Threshold_Recording):
             true_y, true_x = np.histogram(trial_spikes, bins=np.arange(-pre_trial_window, self.trial_length+post_trial_window, bin_size))
 
             if baselined:
+                assert pre_trial_window > 0, 'Cannot apply baseline subtraction with no baseline'
                 trial_peaks = resp_peaks[(resp_peaks > window_start-pre_trial_window*self.fs) & (resp_peaks < window_end+post_trial_window*self.fs)]
                 trial_peaks = [(i-start)/self.fs for i in trial_peaks]
-                pre_peaks = resp_peaks[(resp_peaks < start) & (resp_peaks > window_start)]
-                pre_spikes = cluster_spikes[(cluster_spikes < start) & (cluster_spikes > window_start)]
-                faux_trial_spikes = []
-                for i, j in zip(trial_peaks[:-1], trial_peaks[1:]):
-                    faux_sniff_spikes = [k*(j-i) + i for k in sniff_locked_spikes]
-                    faux_trial_spikes.append(faux_sniff_spikes)
+#                pre_peaks = resp_peaks[(resp_peaks < start) & (resp_peaks > window_start)]
+#                pre_spikes = cluster_spikes[(cluster_spikes < start) & (cluster_spikes > window_start)]
+                peak_diffs = np.diff(trial_peaks)
+                fin_peak = trial_peaks[:-1]
+                faux_trial_spikes = np.outer(peak_diffs, sniff_locked_spikes) + np.array(fin_peak)[:, np.newaxis]
                 faux_trial_spikes = np.hstack(faux_trial_spikes)
                 fauxy, fauxx = np.histogram(faux_trial_spikes, bins=np.arange(-pre_trial_window, self.trial_length+post_trial_window, bin_size))
                 if sum(true_y[:int(pre_trial_window/bin_size)]) == 0:
