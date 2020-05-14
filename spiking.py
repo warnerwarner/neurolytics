@@ -12,8 +12,8 @@ class Spiking():
         self.recording_dir = recording_dir
         self.amplitudes = None
 
-    def get_firing_rate(self, exp_length, *, bin_size=1):
-        ys, xs = np.histogram(self.get_spike_times(), bins=np.arange(0, exp_length, 1))
+    def get_firing_rate(self, exp_length, *, bin_size=1, fs=30000):
+        ys, xs = np.histogram(self.spike_times/fs, bins=np.arange(0, exp_length, bin_size))
         return xs[:-1], ys/bin_size
 
     def plot_firing_rate(self, exp_length, *, ax=None, bin_size=1):
@@ -22,6 +22,7 @@ class Spiking():
             ax = fig.add_subplot(111)
         xs, ys = self.get_firing_rate(exp_length, bin_size=bin_size)
         ax.plot(xs, ys)
+
 
 
 class Cluster(Spiking):
@@ -49,7 +50,8 @@ class ThresholdCrossings(Spiking):
     Contains the spike times, recording directory, the channel number in the orignal recording, and the threshold used
     '''
 
-    def __init__(self, times, recording_dir, channel_num, threshold):
+    def __init__(self, times, recording_dir, channel_num, threshold, *, spike_thresholds=None):
         Spiking.__init__(self, times, recording_dir)
         self.channel_num = channel_num
         self.threshold = threshold
+        self.spike_thresholds = spike_thresholds
