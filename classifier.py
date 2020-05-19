@@ -1,3 +1,7 @@
+'''
+TODO - PCA classifier up into train and test data
+'''
+
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler, StandardScaler, RobustScaler
 from sklearn.svm import LinearSVC
@@ -41,6 +45,30 @@ class Classifier():
         self.window_end = None
         self.trial_names = None
 
+
+    def reassign_trial_label(self, trial_name, new_name):
+        assert trial_name in self.trial_names, 'Trial to change is not present in trial_names'
+        assert self.unit_response is not None, 'Please construct/define unit response'
+        if new_name not in self.trial_names:
+            print('Warning: new name is not already in trial names')
+
+        y_var = self.y_var
+        reassigned_y_var = [new_name if i == trial_name else i for i in y_var]
+        self.y_var = reassigned_y_var
+        trial_names = np.array(self.trial_names)
+        if new_name in trial_names:
+            old_response = self.unit_response[np.where(trial_names == trial_name)[0][0]]
+            new_response = self.unit_response[np.where(trial_names == new_name)[0][0]]
+            combined_response = np.concatenate([old_response, new_response])
+            self.unit_response[np.where(trial_names == trial_name)[0][0]] = combined_response
+            del self.unit_response[np.where(trial_names == new_name)[0][0]]
+            trial_names = np.delete(trial_names, np.where(trial_names == trial_name)[0][0])
+            #trial_names[np.where(trial_names == trial_name)[0][0]] = new_name
+        else:
+            trial_names[np.where(trial_names == trial_name)[0][0]] = new_name
+        self.trial_names = list(trial_names)
+
+
     def make_pcad_response(self, n_components, trial_names, *, window_size=None, baseline=True, reassign_y_var=None):
         '''
         Create and return a pcad unit response
@@ -83,7 +111,7 @@ class Classifier():
             trial_response = self.unit_response[trial_index]
             for i in range(trial_response.shape[0]):
                 y_var.append(j)
-        if reassign_y_var:
+        if reassign_y_var is not None:
             for i in reassign_y_var:
                 y_var = [i[0] if j == i[1] else j for j in y_var]
 
@@ -200,15 +228,17 @@ class Classifier():
         self.y_var = y_var
         self.trial_names = trial_names
         if return_resp:
-            return trial_responses
+            return all_trial_responses
 
-    def make_difference_response(self, trial_names_odour, trial_names_blanks, *, baseline=False, window_start=None, window_end=None):
+    def make_difference_response(self, trial_names_odour, trial_names_blanks, *, baseline=False):
         '''
         Sets the unit_response to be the difference between odour and blank trials - currently uses the difference between the odour and a random blank, not the average
         '''
-        blank_response = self.make_unit_response(trial_names_blanks, baseline=baseline, window_start=window_start, window_end=window_end, return_resp=True)
-        odour_response = self.make_unit_response(trial_names_odour, baseline=baseline, window_start=window_start, window_end=window_end, return_resp=True)
-        difference = odour_response - blank_response
+        blank_response = self.make_unit_response(trial_names_blanks, baseline=baseline, return_resp=True)
+        odour_response = self.make_unit_response(trial_names_odour, baseline=baseline, return_resp=True)
+        difference = []
+        for i, j in zip(odour_response, blank_response):
+            difference.append(i - j)
         self.unit_response = difference
 
     def window_classifier(self, trial_names, window_start, window_end, *, baseline=False, shuffle=False, sub_units=None, reassign_y_var=None):

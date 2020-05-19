@@ -6,6 +6,7 @@ import csv
 from threshold_recording import Threshold_Recording, bandpass_data
 import openephys as oe
 from scipy.signal import find_peaks
+from tqdm import tqdm
 
 
 class Unit_Recording(Threshold_Recording):
@@ -226,12 +227,20 @@ class Unit_Recording(Threshold_Recording):
         else:
             clusters = self.get_non_noise_clusters()
 
-        all_cluster_responses = [self.get_binned_trial_response(trial_name,
-                                                                i.cluster_num,
-                                                                pre_trial_window=pre_trial_window,
-                                                                post_trial_window=post_trial_window,
-                                                                bin_size=bin_size,
-                                                                baselined=baselined)[1] for i in clusters]
+        if baselined:
+            all_cluster_responses = [self.get_binned_trial_response(trial_name,
+                                                                    i.cluster_num,
+                                                                    pre_trial_window=pre_trial_window,
+                                                                    post_trial_window=post_trial_window,
+                                                                    bin_size=bin_size,
+                                                                    baselined=baselined)[1] for i in tqdm(clusters)]
+        else:
+            all_cluster_responses = [self.get_binned_trial_response(trial_name,
+                                                                    i.cluster_num,
+                                                                    pre_trial_window=pre_trial_window,
+                                                                    post_trial_window=post_trial_window,
+                                                                    bin_size=bin_size,
+                                                                    baselined=baselined)[1] for i in clusters]
         xs, i = self.get_binned_trial_response(trial_name, clusters[0].cluster_num, pre_trial_window=pre_trial_window,
                                                post_trial_window=post_trial_window, bin_size=bin_size, baselined=False)
         return xs, all_cluster_responses
