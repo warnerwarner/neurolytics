@@ -3,7 +3,9 @@ from tqdm import tqdm
 
 
 class Cluster():
-    def __init__(self, channel_map, channel_positions, cluster_num, times, recording_dir, label, template_ind, template):
+
+    def __init__(self, channel_map, channel_positions, cluster_num,
+                 times, recording_dir, label, template_ind, template):
         '''
         Arguments:
         channel_map: Map between the data file and the templates
@@ -71,11 +73,12 @@ class Cluster():
         '''
         Displays info on the cluster
         '''
-        return 'Cluster: %d\nLabel: %s\nSpike count: %d\nMax chan: %d\nDir: %s\n' % (self.get_cluster_num(),
-                                                                                     self.get_label(),
-                                                                                     len(self.get_spike_times()),
-                                                                                     self.get_max_chan(),
-                                                                                     self.get_recording_dir())
+        return """Cluster: %d\nLabel: %s\nSpike count: %d\nMax chan:
+                  %d\nDir: %s\n""" % (self.get_cluster_num(),
+                                      self.get_label(),
+                                      len(self.get_spike_times()),
+                                      self.get_max_chan(),
+                                      self.get_recording_dir())
 
     def _set_amplitudes(self, amplitudes):
         '''
@@ -83,18 +86,24 @@ class Cluster():
         '''
         self.amplitudes = amplitudes
 
-    def find_amplitudes(self, data, *, conversion_rate=0.195, pre_spike_window=30, post_spike_window=60, tqdm_on=True):
+    def find_amplitudes(self, data, *, conversion_rate=0.195,
+                        pre_spike_window=30, post_spike_window=60,
+                        tqdm_on=True):
         '''
-        Find the amplitudes of spikes assigned to the cluster using the difference between the min and max values of the spike
+        Find the amplitudes of spikes assigned to the cluster using the
+        difference between the min and max values of the spike
 
         Arguments:
         data: The data (C x t) the cluster was extracted from
 
         Optional arguments:
-        conversion_rate: The conversion rate to transform from bits to volts, default 0.195
-        pre_spike_window: The window before the spike time to take, in samples, default 30
-        post_spike_window: The window after the spike time to take, in samples, default 60
-        tqdm_on: If tqdm should be used to keep track of the amplitude assigning
+        conversion_rate: The conversion rate to transform from bits to volts
+                         default 0.195
+        pre_spike_window: The window before the spike time to take, in samples
+                         default 30
+        post_spike_window: The window after the spike time to take, in samples
+                          default 60
+        tqdm_on: If tqdm should be used to keep track of the amplitude assigned
         '''
         best_chan = data[self.get_max_chan()]
         amps = []
