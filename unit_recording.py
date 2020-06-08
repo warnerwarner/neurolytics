@@ -268,8 +268,8 @@ class Unit_Recording(Threshold_Recording):
         cluster_trial_spikes = []
         resp_peaks = self.resp_peaks
         #base_hist = np.histogram(cluster.sniff_lock_spikes, bins=np.arange(0, 1.01, 0.01))
+        
         for start in starts:
-
             window_start = int(start - pre_trial_window*self.fs)
             window_end = int(start + (self.trial_length + post_trial_window)*self.fs)
             trial_spikes = cluster_spikes[(cluster_spikes >= window_start) & (cluster_spikes <= window_end)]
