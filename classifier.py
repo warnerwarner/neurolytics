@@ -11,8 +11,7 @@ import random
 from sklearn.exceptions import ConvergenceWarning
 import warnings
 warnings.filterwarnings('ignore', category=ConvergenceWarning)
-
-
+ 
 class Classifier():
     '''
     Classifies responses to different trials using a vairety of classifiers and techniques
@@ -69,7 +68,7 @@ class Classifier():
         self.trial_names = list(trial_names)
 
 
-    def make_pcad_response(self, n_components, trial_names, *, window_size=None, baseline=True, reassign_y_var=None):
+    def make_pcad_response(self, n_components, trial_names, *, trace_start=0, window_size=None, baseline=True, reassign_y_var=None):
         '''
         Create and return a pcad unit response
 
@@ -89,15 +88,20 @@ class Classifier():
         else:  # Check that the trial names being passed were used to build the unit response
             assert [i in self.trial_names for i in trial_names], 'Trial name passed not in classifiers response'
 
+        bin_start =  int((self.pre_trial_window + trace_start) / self.bin_size)
         # Changing the shape to be PCAd
         pcad_response = []
         trial_responses = [np.concatenate(i) for i in self.unit_response]
         combined_response = np.concatenate(trial_responses)
+        combined_response = combined_response[:, bin_start:]
 
         # Apply a rolling average window across the response if required
         if window_size is not None:
             assert isinstance(window_size, int), 'Window size must be an int'
-            combined_response = combined_response[:, window_size:] - combined_response[:, :-window_size]
+            windowed_response = np.cumsum(combined_response, dtype=float, axis=-1)
+            windowed_response[:, window_size:] = windowed_response[:, window_size:] - windowed_response[:, :-window_size]
+            windowed_response = windowed_response[:, :1 - window_size] / window_size
+            combined_response = windowed_response
 
         # If the number of components passed is greater than the number of features then reduces the components to n_features
         if n_components > combined_response.shape[1]:
@@ -153,6 +157,8 @@ class Classifier():
         self.y_train = y_train
         self.y_test = y_test
         self.y_var = y_var
+
+
 
     def full_pca_classifier(self, n_components, trial_names, *,  baseline=True, shuffle=False, reassign_y_var=None, single_components=None):
         '''
@@ -266,7 +272,15 @@ class Classifier():
 
         # Runs if sub units is set to an int, only uses a random subsection of units
         if sub_units is not None:
-            random_units = np.random.randint(0, self.num_of_units, sub_units)
+            if sub_units > self.num_of_units:
+                print('Sub unit count too high, reducing to number of units')
+                sub_units = self.num_of_units
+            random_units = []
+            while len(random_units) < sub_units:
+                r = np.random.randint(0, self.num_of_units)
+                if r not in random_units:
+                    random_units.append(r)
+            random_units = np.array(random_units)
             full_response = full_response[:, random_units]
 
         if shuffle:
