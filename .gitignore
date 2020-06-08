@@ -2,3 +2,8 @@
 .on-save.json
 neurolytics.sublime-project
 neurolytics.sublime-workspace
+.vscode/neurolytics.code-workspace
+.vscode/settings.json
+__pycache__/cluster.cpython-37.pyc
+__pycache__/recording.cpython-37.pyc
+__pycache__/spiking.cpython-37.pyc
