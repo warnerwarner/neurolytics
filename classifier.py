@@ -11,7 +11,7 @@ import random
 from sklearn.exceptions import ConvergenceWarning
 import warnings
 warnings.filterwarnings('ignore', category=ConvergenceWarning)
- 
+
 class Classifier():
     '''
     Classifies responses to different trials using a vairety of classifiers and techniques
@@ -23,7 +23,7 @@ class Classifier():
         self.type = None
         self.varience = 1
         self.trial_spikes = None
-        self.recordings = None
+        self.recordings = []
         self.test_size = test_size
         self.pre_trial_window = pre_trial_window
         self.post_trial_window = post_trial_window

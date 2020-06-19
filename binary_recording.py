@@ -12,8 +12,8 @@ class Binary_recording(Unit_Recording):
     Contains functions and data relevent to binary_recordings, inherets from Unit_Recording
     '''
 
-    def __init__(self, home_dir, channel_count, trial_names, *, trig_chan='100_ADC6.continuous', trial_length=0.12):
-        Unit_Recording.__init__(self, home_dir, channel_count, trial_length)
+    def __init__(self, home_dir, channel_count, trial_names, *, trig_chan='100_ADC6.continuous', trial_length=0.12, **kwargs):
+        Unit_Recording.__init__(self, home_dir, channel_count, trial_length, **kwargs)
         self.trig_chan = trig_chan
         self.trial_names = trial_names
         self.trial_starts = None

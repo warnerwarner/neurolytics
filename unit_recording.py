@@ -18,6 +18,7 @@ class Unit_Recording(Threshold_Recording):
         self.clusters = self._find_clusters()
         self.sniff_basis = sniff_basis
         self.trial_length = trial_length
+        self.trial_names = None
 
     def _find_clusters(self):
         home_dir = self.home_dir

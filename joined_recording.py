@@ -94,7 +94,21 @@ class JoinedRecording():
             return xs[:-1], rec_responses, all_saved_trials
         return xs[:-1], rec_responses
     
-
+    def saved_repeat_bootstrapping(self, rec_responses, saved_trial_size=1):
+        #### Trying to bootstrap save a different way
+        saved_trials = []
+        bootstrapped_trials = []
+        repeat_lengths = [len(i) for i in rec_responses]
+        bootstrap_len = 2*np.max(repeat_lengths) - 2 * saved_trial_size
+        for i in rec_responses:
+            saved_index = np.random.randint(len(i))
+            saved_trials.append(i[saved_index])
+            resta_trials = np.array(i)[np.arange(len(i)) != saved_index]
+            bootstrapped = [np.array(resta_trials[i]) for i in np.random.randint(len(resta_trials), size=bootstrap_len)]
+            bootstrapped_trials.append(bootstrapped)
+        bootstrapped_trials = np.concatenate(bootstrapped_trials, axis=1)
+        saved_trials = np.concatenate(saved_trials, axis=0)
+        return bootstrapped_trials, saved_trials        
 
     def get_multi_trial_response(self, trial_names, *, pre_trial_window=None, post_trial_window=None, baselined=False):
         assert all(i in self.trial_names for i in trial_names), "One or more trial names not present in any recording"
