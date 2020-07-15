@@ -18,7 +18,6 @@ class Binary_recording(Unit_Recording):
         self.trial_names = trial_names
         self.trial_starts = None
         self.trial_ends = None
-        self.resp_peaks = None
 
     def set(self, *, resp_channel='100_ADC1.continuous', sniff_avg=True):
         '''
