@@ -21,14 +21,9 @@ class Correlation_Recording(Unit_Recording):
         self.resp_peaks = None
 
     def set(self):
-        print('finding trial starts')
-        self._find_trial_starts()
+        super().set(self.trial_length*2)
         print('extracting trial names')
         self._extract_trial_names()
-        print('Finding respiration peaks')
-        self._find_respiration_peaks()
-        print('Finding sniff subtracted')
-        self._find_all_sniff_lock_avg(self.trial_length*2)
 
     def _extract_trial_names(self):
         trialbank = pickle.Unpickler(open(self.trialbank_loc, 'rb')).load()
