@@ -5,9 +5,9 @@ from spiking import Cluster
 import csv
 from threshold_recording import Threshold_Recording, bandpass_data
 import openephys as oe
-from scipy.signal import find_peaks
+from scipy.signal import find_peaks, resample
 from tqdm import tqdm
-
+import matplotlib.pyplot as plt
 
 class Unit_Recording(Threshold_Recording):
 
@@ -18,7 +18,10 @@ class Unit_Recording(Threshold_Recording):
         self.clusters = self._find_clusters()
         self.sniff_basis = sniff_basis
         self.trial_length = trial_length
-        self.trial_names = None
+        self.trig_chan =  None
+        self.trial_names = []
+        self.resp_peaks = None
+        self.resp_trace = None
 
     def _find_clusters(self):
         home_dir = self.home_dir
@@ -69,6 +72,7 @@ class Unit_Recording(Threshold_Recording):
             self.clusters.append(cluster)
         except(AssertionError):
             raise TypeError('New cluster must be of a Cluster object')
+        plt.figure()
 
     def get_cluster(self, cluster_num):
         cluster = [i for i in self.clusters if i.cluster_num == cluster_num]
@@ -89,6 +93,9 @@ class Unit_Recording(Threshold_Recording):
         self._find_respiration_peaks(resp_channel=resp_channel)
         print('Finding sniff locked avgs')
         self._find_all_sniff_lock_avg(pre_trial_window)
+        print('Finding respiration trace')
+        self._find_respiration_trace(resp_channel=resp_channel)
+
 
 
     def _find_trial_starts(self):
@@ -117,7 +124,7 @@ class Unit_Recording(Threshold_Recording):
             self.trial_starts = np.array(trial_starts)
             print('Saving starts and ends')
             np.save(os.path.join(self.home_dir, 'trial_starts.npy'), trial_starts)
-            np.save(os.path.join(self.home_dir, 'trial_ends.npy'), trial_starts)
+            np.save(os.path.join(self.home_dir, 'trial_ends.npy'), trial_starts)        
 
     def _find_respiration_peaks(self, *, resp_channel='100_ADC1.continuous'):
         if os.path.isfile(os.path.join(self.home_dir, 'respiration_peaks.npy')):
@@ -130,6 +137,18 @@ class Unit_Recording(Threshold_Recording):
             respiration_peaks = find_peaks(bp_data, height=np.std(bp_data), prominence=np.std(bp_data))[0]
             np.save(os.path.join(self.home_dir, 'respiration_peaks.npy'), respiration_peaks)
         self.resp_peaks = respiration_peaks
+
+    def _find_respiration_trace(self, *, resp_channel='100_ADC1.continuous'):
+        if os.path.isfile(os.path.join(self.home_dir, 'respiration_trace.npy')):
+            print('Respiration trace found')
+            respiration_trace = np.load(os.path.join(self.home_dir, 'respiration_trace.npy'))
+        else:
+            print('Finding respiration trace')
+            resp = oe.loadContinuous2(os.path.join(self.home_dir, resp_channel))['data']
+            resp_snippets = [resample(resp[i:j], 10000) for i, j in tqdm(zip(self.resp_peaks[:-1], self.resp_peaks[1:]))]
+            respiration_trace= np.mean(resp_snippets, axis=0)
+            np.save(os.path.join(self.home_dir, 'respiration_trace.npy'), respiration_trace)
+        self.resp_trace = respiration_trace
 
     def _find_all_sniff_lock_avg(self, pre_trial_window):
         # if bp_resp:
@@ -158,10 +177,11 @@ class Unit_Recording(Threshold_Recording):
 
 
 
-    def get_sniff_lock_avg(self, cluster_num, pre_trial_window, resp_peaks):
-
+    def get_sniff_lock_avg(self, cluster, pre_trial_window, resp_peaks):
+        if isinstance(cluster, (int, float)):
+            cluster = self.get_cluster(cluster)            
         trial_starts = self.trial_starts
-        spike_times = self.get_cluster(cluster_num).spike_times
+        spike_times = cluster.spike_times
         single_sniff_spikes = []
         for start in trial_starts:
             pre_trial_peaks = resp_peaks[(resp_peaks > start - pre_trial_window*self.fs) & (resp_peaks < start)]
@@ -175,18 +195,20 @@ class Unit_Recording(Threshold_Recording):
 
 
 
+
     def get_unique_trial_names(self):
         return list(set(self.trial_names))
 
     def get_unique_trial_starts(self, trial_name):
         try:
-            assert trial_name in self.trial_names
+            assert trial_name in self.trial_names  # Don't know why this throws a warning, it does work
         except (AssertionError):
             raise ValueError('Trial name not in trial names')
         return [j for i, j in zip(self.trial_names, self.trial_starts) if i == trial_name]
 
-    def get_cluster_trial_response(self, trial_name, cluster_num, *, pre_trial_window=None, post_trial_window=None, real_time=True):
-        cluster = self.get_cluster(cluster_num)
+    def get_cluster_trial_response(self, trial_name, cluster, *, pre_trial_window=None, post_trial_window=None, real_time=True):
+        if isinstance(cluster, (int, float)):
+            cluster = self.get_cluster(cluster)
         cluster_spikes = cluster.spike_times
         starts = self.get_unique_trial_starts(trial_name)
         cluster_trial_spikes = []
@@ -221,7 +243,6 @@ class Unit_Recording(Threshold_Recording):
                                                                  post_trial_window=post_trial_window) for cluster in clusters]
         return all_cluster_responses
 
-
     def get_all_binned_trial_response(self, trial_name, *, only_good=True, pre_trial_window=None, post_trial_window=None, bin_size=0.01, baselined=False):
         if only_good:
             clusters = self.get_good_clusters()
@@ -234,7 +255,7 @@ class Unit_Recording(Threshold_Recording):
                                                                     pre_trial_window=pre_trial_window,
                                                                     post_trial_window=post_trial_window,
                                                                     bin_size=bin_size,
-                                                                    baselined=baselined)[1] for i in tqdm(clusters)]
+                                                                    baselined=baselined)[1] for i in tqdm(clusters, leave=False)]
         else:
             all_cluster_responses = [self.get_binned_trial_response(trial_name,
                                                                     i.cluster_num,
@@ -242,16 +263,16 @@ class Unit_Recording(Threshold_Recording):
                                                                     post_trial_window=post_trial_window,
                                                                     bin_size=bin_size,
                                                                     baselined=baselined)[1] for i in clusters]
-        xs, i = self.get_binned_trial_response(trial_name, clusters[0].cluster_num, pre_trial_window=pre_trial_window,
+        xs, _ = self.get_binned_trial_response(trial_name, clusters[0].cluster_num, pre_trial_window=pre_trial_window,
                                                post_trial_window=post_trial_window, bin_size=bin_size, baselined=False)
         return xs, all_cluster_responses
 
 
 
 
-    def get_binned_trial_response(self, trial_name, cluster_num, *, pre_trial_window=None, post_trial_window=None, real_time=True, bin_size=0.01, baselined=True):
-
-        cluster = self.get_cluster(cluster_num)
+    def get_binned_trial_response(self, trial_name, cluster, *, pre_trial_window=None, post_trial_window=None, real_time=True, bin_size=0.01, baselined=True):
+        if isinstance(cluster, (int, float)):
+            cluster = self.get_cluster(cluster)
 
         if pre_trial_window is None:
             pre_trial_window = 2*self.trial_length
@@ -269,7 +290,6 @@ class Unit_Recording(Threshold_Recording):
         cluster_trial_spikes = []
         resp_peaks = self.resp_peaks
         #base_hist = np.histogram(cluster.sniff_lock_spikes, bins=np.arange(0, 1.01, 0.01))
-        
         for start in starts:
             window_start = int(start - pre_trial_window*self.fs)
             window_end = int(start + (self.trial_length + post_trial_window)*self.fs)
@@ -277,19 +297,17 @@ class Unit_Recording(Threshold_Recording):
             trial_spikes = [i - start for i in trial_spikes]
             if real_time:
                 trial_spikes = [i/self.fs for i in trial_spikes]
-            true_y, true_x = np.histogram(trial_spikes, bins=np.arange(-pre_trial_window, self.trial_length+post_trial_window, bin_size))
-
+            true_y, true_x = np.histogram(trial_spikes, bins=np.arange(-1*pre_trial_window, self.trial_length+post_trial_window+bin_size, bin_size))
+            
             if baselined:
                 assert pre_trial_window > 0, 'Cannot apply baseline subtraction with no baseline'
                 trial_peaks = resp_peaks[(resp_peaks > window_start-pre_trial_window*self.fs) & (resp_peaks < window_end+post_trial_window*self.fs)]
                 trial_peaks = [(i-start)/self.fs for i in trial_peaks]
-#                pre_peaks = resp_peaks[(resp_peaks < start) & (resp_peaks > window_start)]
-#                pre_spikes = cluster_spikes[(cluster_spikes < start) & (cluster_spikes > window_start)]
                 peak_diffs = np.diff(trial_peaks)
                 fin_peak = trial_peaks[:-1]
                 faux_trial_spikes = np.outer(peak_diffs, sniff_locked_spikes) + np.array(fin_peak)[:, np.newaxis]
                 faux_trial_spikes = np.hstack(faux_trial_spikes)
-                fauxy, fauxx = np.histogram(faux_trial_spikes, bins=np.arange(-pre_trial_window, self.trial_length+post_trial_window, bin_size))
+                fauxy, fauxx = np.histogram(faux_trial_spikes, bins=np.arange(-1*pre_trial_window, self.trial_length+post_trial_window+bin_size, bin_size))
                 if sum(true_y[:int(pre_trial_window/bin_size)]) == 0:
                     cf = 0
                 else:
@@ -300,10 +318,158 @@ class Unit_Recording(Threshold_Recording):
             #cluster_trial_spikes.append(trial_spikes)
         return true_x, cluster_trial_spikes
 
-if __name__ == '__main__':
-    cluster = Cluster([[1], [3], [4]], None, None, None, None, None, None, np.array([[10, 1, 5], [1, 3, 5]]))
-    eh = [1]
-    try:
-        assert isinstance(eh, Cluster)
-    except(AssertionError):
-        raise AssertionError('Need to add Cluster object')
+
+    ##############################
+    ########### BEWARE ###########
+    ######## NOT DONE YET ########
+    ### ENTER AT YOUR OWN RISK ###
+    ##############################
+    def cluster_plots(self, cluster, *, sniff_lock=True, fr_bin=60, spikes_shown=100, pre_spike_waveform=30, post_spike_waveform=60, **kwargs):
+        '''
+        Constucts a 2 x 2 set of figures that can be used to decribe the attributes of a given cluster. 
+
+        Arguments:
+        cluster - The cluster to use for construction
+
+        Optional arguments:
+        sniff_lock - I dont know what this does... but I'll leave it in for now
+        fr_bin - The bin size (in seconds) for the firing rate plot
+        spikes_shown - The number of example spikes to plot in the waveform plot
+        pre_spike_waveform - The number of samples to take prior to the spike time
+        post_spike_waveform - The number of samples to take post to the spike time        
+        '''
+
+        # If the cluster is a cluster then uses it, otherwise finds the cluster from the number
+        if isinstance(cluster, (int, float)):
+            cluster = self.get_cluster(cluster)
+        fig, ax = plt.subplots(2, 2, *kwargs) # Make some plots 
+        # The waveform plot
+        self.waveform_plot(cluster, ax=ax[0, 0], spikes_shown=spikes_shown, pre_spike_waveform=pre_spike_waveform, post_spike_waveform=post_spike_waveform, *kwargs)
+    
+    def get_unit_waveforms(self, cluster, *, pre_window=1, post_window=2, zeroing='first'):
+        '''
+        Gets all the waveforms from a raw recording, very fast (at least on CAMP)
+
+        Arguments:
+        cluster: Which cluster to find the spikes from, can be a Cluster object, or a cluster number
+        Optional arguments:
+        pre_window: The window size prior to the spike time to include, in ms, default 1
+        post_window: The window size post to the spike time to include, in ms, default 2
+        zeroing: Method for removing offset, can be:
+            - 'first', sets the first value from each spike snippet to zero, default
+            - 'mean', sets the mean of each spike to zero
+            - 'median', sets the median of each spike to zero
+            - None, does nothing
+        '''
+        # Check if the cluster is a number, and if it is change it to an Cluster
+        if isinstance(cluster, (int, float)):
+            cluster = self.get_cluster(cluster)
+        spike_times = cluster.spike_times
+
+        # Open the data
+        data = open(os.path.join(self.home_dir, self.dat_name), 'rb')
+        prev_loc = 0
+        waveforms = []
+
+        # Find the size of the chunk (in samples) to extract
+        chunk_size = self.channel_count*(pre_window + post_window) * self.fs/1000
+
+        # Offset is the size before the spike to find, this is in bytes
+        offset_size = pre_window*self.fs/1000 * 2 * self.channel_count
+        for i in tqdm(spike_times, leave=False):
+
+            # Loads in the chunk of data from the binary file
+            chunk = np.fromfile(data, count = chunk_size, dtype=np.int16, offset=int(64*i - offset_size) - prev_loc)
+            # Find current location
+            prev_loc = data.tell()
+            # Append the chunk to the list
+            waveforms.append(chunk)
+
+        # Convert to an array, reshape, and change to 32 bit not 16 (stops overflows) 
+        waveforms = np.array(waveforms)
+        new_shape = (len(waveforms), int(chunk_size/self.channel_count), self.channel_count)
+        waveforms = waveforms.reshape(new_shape, order='C')
+        waveforms = waveforms.astype(np.int32) 
+        
+        # zero options, e.g. remove the offset for the snippets
+        if zeroing == 'first':
+            waveforms = waveforms - waveforms[:, 0, :][:, np.newaxis]  # Set the first value to zero
+        elif zeroing == 'mean':
+            waveforms = waveforms - np.mean(waveforms, axis=1)[:, np.newaxis]  # Remove the mean across the whole spike
+        elif zeroing == 'median':
+            waveforms = waveforms - np.median(waveforms, axis=1)[:, np.newaxis]  # Remove the median value from each spike
+        elif zeroing is not None:
+            print('Misunderstood zeroing method, waveforms wont be zeroed')
+        data.close()  # Probs dont need to close, but might as well be good
+        return waveforms
+
+
+    def waveform_plot(self, cluster, *, ax = None, spikes_shown=100, pre_window=1, post_window=2, zeroing='first'):
+        '''
+        Constructs a unit waveform plot, calls the get_unit_waveforms to find the waveforms
+
+        Arguments:
+        cluster - The cluster to construct the waveforms from
+        Optional arguments:
+        ax - The axis to plot on, if none will constuct their own
+        spikes_shown - Number of spikes to 
+        '''
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+
+        waveforms = self.get_unit_waveforms(cluster, pre_window=pre_window, post_window=post_window, zeroing=zeroing) 
+        xs = np.arange(-pre_window, post_window, 1000/self.fs)
+        if len(waveforms) <= spikes_shown:
+            print('Too many spikes requested, reducing %d-->%d' % (spikes_shown, len(waveforms)))
+            spikes_shown = len(waveforms)
+        for i in range(spikes_shown):
+            snip = waveforms[int(i*len(waveforms)/spikes_shown)]
+            ax.plot(xs, snip*0.195, color='lightgray')
+        ax.plot(xs, np.mean(waveforms, axis=0)*0.195, color='r')
+        ax.set_ylabel('Voltage ($\mu$V)')
+        ax.set_xlabel('Time (ms)')
+
+    def autocorrelogram_plot(self, cluster, *, ax=None, bin_size=1, window_size=50):
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+
+        spike_times = cluster.spike_times
+
+        diffs = []
+        for i in range(len(spike_times)):
+            diff = spike_times[i+1:] - spike_times[i]
+            diffs.append(diff[diff <= bin_size*30*window_size])
+        diffs = np.concatenate(diffs)
+        diffs = np.concatenate([diffs, diffs * - 1])
+
+        hists = np.histogram(diffs, bins=np.arange(-window_size*30, 30*(window_size+bin_size), bin_size*30))[0]
+        bar_lim = window_size - bin_size/2
+        ax.bar(hists[1][:-1]/30, hists[0]/len(spike_times), width=bin_size)
+        ax.set_xlabel('Inter-spike interval')
+        ax.set_ylabel('Spike probability')
+        ax.set_xlim(-bar_lim, bar_lim)
+    
+    def firing_rate_plot(self, cluster, *, ax=None, bin_size=60):
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        xs, fr = cluster.get_firing_rate(self.rec_length, bin_size=bin_size)
+
+        ax.plot(xs, fr)
+        ax.set_ylabel('Firing rate (Hz)')
+        ax.set_xlabel('Time (s)')
+
+
+            
+
+
+
+# if __name__ == '__main__':
+#     cluster = Cluster([[1], [3], [4]], None, None, None, None, None, None, np.array([[10, 1, 5], [1, 3, 5]]))
+#     eh = [1]
+#     try:
+#         assert isinstance(eh, Cluster)
+#     except(AssertionError):
+#         raise AssertionError('Need to add Cluster object')
