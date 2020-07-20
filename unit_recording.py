@@ -324,7 +324,7 @@ class Unit_Recording(Threshold_Recording):
     ######## NOT DONE YET ########
     ### ENTER AT YOUR OWN RISK ###
     ##############################
-    def cluster_plots(self, cluster, *, sniff_lock=True, fr_bin=60, spikes_shown=100, pre_spike_waveform=30, post_spike_waveform=60, **kwargs):
+    def cluster_plots(self, cluster, *, sniff_lock=True, fr_bin=60, spikes_shown=100, pre_spike_waveform=1, post_spike_waveform=2, **kwargs):
         '''
         Constucts a 2 x 2 set of figures that can be used to decribe the attributes of a given cluster. 
 
@@ -342,10 +342,25 @@ class Unit_Recording(Threshold_Recording):
         # If the cluster is a cluster then uses it, otherwise finds the cluster from the number
         if isinstance(cluster, (int, float)):
             cluster = self.get_cluster(cluster)
-        fig, ax = plt.subplots(2, 2, *kwargs) # Make some plots 
+        fig, ax = plt.subplots(2, 2, **kwargs) # Make some plots 
         # The waveform plot
-        self.waveform_plot(cluster, ax=ax[0, 0], spikes_shown=spikes_shown, pre_spike_waveform=pre_spike_waveform, post_spike_waveform=post_spike_waveform, *kwargs)
-    
+        print('Getting waveforms')
+        self.waveform_plot(cluster, ax=ax[0, 0], spikes_shown=spikes_shown, pre_window=pre_spike_waveform, post_window=post_spike_waveform)
+        
+        # The firing rate
+        print('Getting firing rate')
+        self.firing_rate_plot(cluster, ax=ax[1, 0])
+
+        # The autocorrelogram
+        print('Getting autocorr')
+        self.autocorrelogram_plot(cluster, ax=ax[0, 1])
+
+        # The phase
+        print('Getting phase')
+        self.phase_plot(cluster, ax=ax[1, 1])
+
+        return fig, ax
+
     def get_unit_waveforms(self, cluster, *, pre_window=1, post_window=2, zeroing='first'):
         '''
         Gets all the waveforms from a raw recording, very fast (at least on CAMP)
@@ -372,7 +387,7 @@ class Unit_Recording(Threshold_Recording):
         waveforms = []
 
         # Find the size of the chunk (in samples) to extract
-        chunk_size = self.channel_count*(pre_window + post_window) * self.fs/1000
+        chunk_size = int(self.channel_count*(pre_window + post_window) * self.fs/1000)
 
         # Offset is the size before the spike to find, this is in bytes
         offset_size = pre_window*self.fs/1000 * 2 * self.channel_count
@@ -404,7 +419,7 @@ class Unit_Recording(Threshold_Recording):
         return waveforms
 
 
-    def waveform_plot(self, cluster, *, ax = None, spikes_shown=100, pre_window=1, post_window=2, zeroing='first'):
+    def waveform_plot(self, cluster, *, ax = None, spikes_shown=100, pre_window=1, post_window=2, zeroing='first', channel='max'):
         '''
         Constructs a unit waveform plot, calls the get_unit_waveforms to find the waveforms
 
@@ -417,8 +432,14 @@ class Unit_Recording(Threshold_Recording):
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
+        if isinstance(cluster, (int, float)):
+            cluster = self.get_cluster(cluster)
 
-        waveforms = self.get_unit_waveforms(cluster, pre_window=pre_window, post_window=post_window, zeroing=zeroing) 
+        waveforms = self.get_unit_waveforms(cluster, pre_window=pre_window, post_window=post_window, zeroing=zeroing)
+        if channel != 'max':
+            waveforms = waveforms[:, :, channel]
+        else:
+            waveforms = waveforms[:, :, cluster.max_chan]
         xs = np.arange(-pre_window, post_window, 1000/self.fs)
         if len(waveforms) <= spikes_shown:
             print('Too many spikes requested, reducing %d-->%d' % (spikes_shown, len(waveforms)))
@@ -429,37 +450,67 @@ class Unit_Recording(Threshold_Recording):
         ax.plot(xs, np.mean(waveforms, axis=0)*0.195, color='r')
         ax.set_ylabel('Voltage ($\mu$V)')
         ax.set_xlabel('Time (ms)')
+        ax.set_xlim(-1, 2)
 
     def autocorrelogram_plot(self, cluster, *, ax=None, bin_size=1, window_size=50):
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
+        if isinstance(cluster, (int, float)):
+            cluster = self.get_cluster(cluster)
 
         spike_times = cluster.spike_times
 
         diffs = []
-        for i in range(len(spike_times)):
+        for i in tqdm(range(len(spike_times)), leave=False):
             diff = spike_times[i+1:] - spike_times[i]
             diffs.append(diff[diff <= bin_size*30*window_size])
         diffs = np.concatenate(diffs)
         diffs = np.concatenate([diffs, diffs * - 1])
 
-        hists = np.histogram(diffs, bins=np.arange(-window_size*30, 30*(window_size+bin_size), bin_size*30))[0]
+        hists = np.histogram(diffs, bins=np.arange(-window_size*30, 30*(window_size+bin_size), bin_size*30))
         bar_lim = window_size - bin_size/2
-        ax.bar(hists[1][:-1]/30, hists[0]/len(spike_times), width=bin_size)
-        ax.set_xlabel('Inter-spike interval')
-        ax.set_ylabel('Spike probability')
+        ax.bar(hists[1][:-1]/30, hists[0]/len(spike_times), width=bin_size, align='edge')
+        ax.set_xlabel('Inter-spike interval (ms)')
+        ax.set_ylabel('Normalised spike probability')
         ax.set_xlim(-bar_lim, bar_lim)
     
-    def firing_rate_plot(self, cluster, *, ax=None, bin_size=60):
+    def firing_rate_plot(self, cluster, *, ax=None, bin_size=60, min_base=True):
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
+        if isinstance(cluster, (int, float)):
+            cluster = self.get_cluster(cluster)
+        
         xs, fr = cluster.get_firing_rate(self.rec_length, bin_size=bin_size)
-
+        if min_base:
+            xs = xs/60
+            xlim = self.rec_length/60
+            basis = 'mins'
+        else:
+            xlim = self.rec_length
+            basis = 's'
         ax.plot(xs, fr)
         ax.set_ylabel('Firing rate (Hz)')
-        ax.set_xlabel('Time (s)')
+        ax.set_xlabel('Time (%s)' % basis)
+        ax.set_xlim(0, xlim)
+
+    def phase_plot(self, cluster, *, ax=None, bin_num=100):
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        if isinstance(cluster, (int, float)):
+            cluster = self.get_cluster(cluster)
+        
+        xs = np.arange(0, 1, 1/bin_num)
+        ax2 = ax.twinx()
+        ax2.set_yticks([])
+        ax2.plot(xs, resample(self.resp_trace, bin_num), color='r')
+        ax.plot(xs, np.histogram(cluster.sniff_lock_spikes, bins=np.arange(0, 1 + 1/bin_num, 1/bin_num))[0]/len(cluster.sniff_lock_spikes))
+        ax.set_ylabel('Normalised spike probability')
+        ax.set_xlabel('Sniff cycle phase')
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0)
 
 
             

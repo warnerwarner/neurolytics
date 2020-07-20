@@ -116,7 +116,7 @@ class JoinedRecording():
             try:
                 rec_responses = np.concatenate(rec_responses, axis=1)
             except:
-                print('Unable to make numpy array')
+                None
         # Response returned is of a shape exps x repeats x units x time
         if saved_trial:
             return xs[:-1], rec_responses, all_saved_trials
@@ -158,3 +158,7 @@ class JoinedRecording():
                 all_cluster_spikes = recording.get_all_trial_response(trial_name, pre_trial_window=pre_trial_window, post_trial_window=post_trial_window)
                 rec_responses.append(all_cluster_spikes)
         return rec_responses
+    
+    def get_single_cluster_trial_response(self, trial_name, pre_trial_window=0.5, post_trial_window=0.5):
+        assert trial_name in self.trial_names, 'Trial is not in any recording'
+
