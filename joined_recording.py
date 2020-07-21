@@ -159,6 +159,20 @@ class JoinedRecording():
                 rec_responses.append(all_cluster_spikes)
         return rec_responses
     
-    def get_single_cluster_trial_response(self, trial_name, pre_trial_window=0.5, post_trial_window=0.5):
+    def get_single_cluster_trial_response(self, trial_name, cluster_index, *, pre_trial_window=0.5, post_trial_window=0.5):
+        """
+        Returns a single cluster response to a passed trial
+        Args:
+            trial_name (string): The name of the trial
+            cluster_index (int): The index of the cluster
+            pre_trial_window (float, optional): Window before the trial to include. Defaults to 0.5.
+            post_trial_window (float, optional): Window after the trial to include. Defaults to 0.5.
+        """
         assert trial_name in self.trial_names, 'Trial is not in any recording'
-
+        
+        cluster = np.concatenate([rec.get_good_clusters() for rec in self.recordings])[cluster_index]
+        recording_index = [index for index, rec in enumerate(self.recordings) for cluster in rec.get_good_clusters()][cluster_index]
+        rec = self.recordings[recording_index]
+        resp = rec.get_cluster_trial_response(trial_name, cluster, pre_trial_window=pre_trial_window, post_trial_window=post_trial_window)
+        return resp
+        
