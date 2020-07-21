@@ -7,10 +7,11 @@ class Spiking():
 
     Hold spike times, and recording directory of spiking object
     '''
-    def __init__(self, spike_times, recording_dir):
+    def __init__(self, spike_times, recording_dir, *, dat_name='100_CHs.dat'):
         self.spike_times = spike_times
         self.recording_dir = recording_dir
         self.amplitudes = None
+        self.dat_name = dat_name
 
     def get_firing_rate(self, exp_length, *, bin_size=1, fs=30000):
         ys, xs = np.histogram(self.spike_times/fs, bins=np.arange(0, exp_length, bin_size))
@@ -22,6 +23,8 @@ class Spiking():
             ax = fig.add_subplot(111)
         xs, ys = self.get_firing_rate(exp_length, bin_size=bin_size)
         ax.plot(xs, ys)
+    
+    def get_waveforms(self, pre_window=30, post_window=60, )
 
 
 
@@ -33,8 +36,8 @@ class Cluster(Spiking):
     '''
 
     def __init__(self, cluster_num, times, recording_dir, label, template_ind,
-                 template, max_chan, *, sniff_lock_spikes=None):
-        Spiking.__init__(self, times, recording_dir)
+                 template, max_chan, *, sniff_lock_spikes=None, dat_name='100_CHs.dat'):
+        Spiking.__init__(self, times, recording_dir, dat_name=dat_name)
         self.cluster_num = cluster_num
         self.label = label
         self.template_ind = template_ind
@@ -50,8 +53,9 @@ class ThresholdCrossings(Spiking):
     Contains the spike times, recording directory, the channel number in the orignal recording, and the threshold used
     '''
 
-    def __init__(self, times, recording_dir, channel_num, threshold, *, spike_thresholds=None):
-        Spiking.__init__(self, times, recording_dir)
+    def __init__(self, times, recording_dir, channel_num, threshold, *, 
+                 spike_thresholds=None, dat_name='100_CHs.dat'):
+        Spiking.__init__(self, times, recording_dir, dat_name=dat_name)
         self.channel_num = channel_num
         self.threshold = threshold
         self.spike_thresholds = spike_thresholds
