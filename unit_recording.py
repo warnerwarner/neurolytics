@@ -347,66 +347,10 @@ class Unit_Recording(Recording):
             cluster_trial_spikes.append(true_y/bin_size)
             #cluster_trial_spikes.append(trial_spikes)
         return true_x, cluster_trial_spikes
-
-    def get_unit_waveforms(self, cluster, *, pre_window=1, post_window=2, zeroing='first'):
-        '''
-        Gets all the waveforms from a raw recording, very fast (at least on CAMP)
-
-        Arguments:
-        cluster: Which cluster to find the spikes from, can be a Cluster object, or a cluster number
-        Optional arguments:
-        pre_window: The window size prior to the spike time to include, in ms, default 1
-        post_window: The window size post to the spike time to include, in ms, default 2
-        zeroing: Method for removing offset, can be:
-            - 'first', sets the first value from each spike snippet to zero, default
-            - 'mean', sets the mean of each spike to zero
-            - 'median', sets the median of each spike to zero
-            - None, does nothing
-        '''
-        # Check if the cluster is a number, and if it is change it to an Cluster
-        if isinstance(cluster, (int, float)):
-            cluster = self.get_cluster(cluster)
-        spike_times = cluster.spike_times
-
-        # Open the data
-        data = open(os.path.join(self.home_dir, self.dat_name), 'rb')
-        prev_loc = 0
-        waveforms = []
-
-        # Find the size of the chunk (in samples) to extract
-        chunk_size = int(self.channel_count*(pre_window + post_window) * self.fs/1000)
-
-        # Offset is the size before the spike to find, this is in bytes
-        offset_size = pre_window*self.fs/1000 * 2 * self.channel_count
-        for i in tqdm(spike_times, leave=False):
-
-            # Loads in the chunk of data from the binary file
-            chunk = np.fromfile(data, count = chunk_size, dtype=np.int16, offset=int(64*i - offset_size) - prev_loc)
-            # Find current location
-            prev_loc = data.tell()
-            # Append the chunk to the list
-            waveforms.append(chunk)
-
-        # Convert to an array, reshape, and change to 32 bit not 16 (stops overflows) 
-        waveforms = np.array(waveforms)
-        new_shape = (len(waveforms), int(chunk_size/self.channel_count), self.channel_count)
-        waveforms = waveforms.reshape(new_shape, order='C')
-        waveforms = waveforms.astype(np.int32) 
-        
-        # zero options, e.g. remove the offset for the snippets
-        if zeroing == 'first':
-            waveforms = waveforms - waveforms[:, 0, :][:, np.newaxis]  # Set the first value to zero
-        elif zeroing == 'mean':
-            waveforms = waveforms - np.mean(waveforms, axis=1)[:, np.newaxis]  # Remove the mean across the whole spike
-        elif zeroing == 'median':
-            waveforms = waveforms - np.median(waveforms, axis=1)[:, np.newaxis]  # Remove the median value from each spike
-        elif zeroing is not None:
-            print('Misunderstood zeroing method, waveforms wont be zeroed')
-        data.close()  # Probs dont need to close, but might as well be good
-        return waveforms
     
-    def cluster_plot(self, cluster):
-        
+    def cluster_plot(self, cluster, **kwargs):
+        plots = Plotter()
+        plots.plot(cluster, *kwargs)
 
 # if __name__ == '__main__':
 #     cluster = Cluster([[1], [3], [4]], None, None, None, None, None, None, np.array([[10, 1, 5], [1, 3, 5]]))

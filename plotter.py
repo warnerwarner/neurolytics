@@ -1,6 +1,7 @@
 from spiking import Cluster
 from unit_recording import Unit_Recording
 import matplotlib.pyplot as plt
+import os
 import numpy as np
 from tqdm import tqdm
 from scipy.signal import resample
@@ -12,11 +13,11 @@ class Plotter():
     def plot(self, objs):
         if isinstance(objs, Cluster):
             self.cluster_plots(objs)
-        elif isinstance(objs, Unit_Recording):
-            self.unit_recording_plot(objs)
+        else:
+            print('Only cluster plotting so far, soz')
 
 
-    def cluster_plots(self, cluster, *, sniff_lock=True, fr_bin=60, spikes_shown=100, pre_spike_waveform=1, post_spike_waveform=2, sniff_voltage=False, **kwargs):
+    def cluster_plots(self, cluster, *, sniff_lock=True, fr_bin=60, spikes_shown=100, pre_spike_waveform=30, post_spike_waveform=60, sniff_voltage=False, **kwargs):
         '''
         Constucts a 2 x 2 set of figures that can be used to decribe the attributes of a given cluster. 
 
@@ -54,7 +55,7 @@ class Plotter():
 
 
 
-    def waveform_plot(self, waveforms, *, ax = None, spikes_shown=100, pre_window=1, post_window=2, zeroing='first', channel='max'):
+    def waveform_plot(self, cluster, *, ax = None, spikes_shown=100, pre_window=1, post_window=2, zeroing='first', channel='max'):
         '''
         Constructs a unit waveform plot, calls the get_unit_waveforms to find the waveforms
 
@@ -67,15 +68,13 @@ class Plotter():
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
-        if isinstance(cluster, (int, float)):
-            cluster = self.get_cluster(cluster)
 
-        waveforms = self.get_unit_waveforms(cluster, pre_window=pre_window, post_window=post_window, zeroing=zeroing)
+        waveforms = cluster.get_waveforms(pre_window=pre_window*30, post_window=post_window*30, zeroing=zeroing)
         if channel != 'max':
             waveforms = waveforms[:, :, channel]
         else:
             waveforms = waveforms[:, :, cluster.max_chan]
-        xs = np.arange(-pre_window, post_window, 1000/self.fs)
+        xs = np.arange(-pre_window, post_window, waveforms.shape[1])
         if len(waveforms) <= spikes_shown:
             print('Too many spikes requested, reducing %d-->%d' % (spikes_shown, len(waveforms)))
             spikes_shown = len(waveforms)
@@ -91,9 +90,6 @@ class Plotter():
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
-        if isinstance(cluster, (int, float)):
-            cluster = self.get_cluster(cluster)
-
         spike_times = cluster.spike_times
 
         diffs = []
@@ -114,16 +110,15 @@ class Plotter():
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
-        if isinstance(cluster, (int, float)):
-            cluster = self.get_cluster(cluster)
-        
-        xs, fr = cluster.get_firing_rate(self.rec_length, bin_size=bin_size)
+
+        rec_length = cluster.get_recording_length()
+        xs, fr = cluster.get_firing_rate(rec_length, bin_size=bin_size)
         if min_base:
             xs = xs/60
-            xlim = self.rec_length/60
+            xlim = rec_length/60
             basis = 'mins'
         else:
-            xlim = self.rec_length
+            xlim = rec_length
             basis = 's'
         ax.plot(xs, fr)
         ax.set_ylabel('Firing rate (Hz)')
@@ -134,16 +129,19 @@ class Plotter():
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
-        if isinstance(cluster, (int, float)):
-            cluster = self.get_cluster(cluster)
         
         xs = np.arange(0, 1, 1/bin_num)
-        ax2 = ax.twinx()
-        if not sniff_voltage:
-            ax2.set_yticks([])
-        else:
-            ax2.set_ylabel('Respiration signal (V)')
-        ax2.plot(xs, resample(self.resp_trace, bin_num), color='r')
+
+        if os.path.isfile(os.path.join(cluster.recording_dir, 'respiration_trace.npy')):
+            resp_trace = np.load(os.path.join(cluster.recording_dir, 'respiration_trace.npy'))
+            ax2 = ax.twinx()
+            if not sniff_voltage:
+                ax2.set_yticks([])
+            else:
+                ax2.set_ylabel('Respiration signal (V)')
+
+            ax2.plot(xs, resample(resp_trace, bin_num), color='r')
+
         ax.plot(xs, np.histogram(cluster.sniff_lock_spikes, bins=np.arange(0, 1 + 1/bin_num, 1/bin_num))[0]/len(cluster.sniff_lock_spikes))
         ax.set_ylabel('Normalised spike probability')
         ax.set_xlabel('Sniff cycle phase')
