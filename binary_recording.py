@@ -19,14 +19,6 @@ class Binary_recording(Unit_Recording):
         self.trial_starts = None
         self.trial_ends = None
 
-    def set(self, *, resp_channel='100_ADC1.continuous', sniff_avg=True):
-        '''
-        Sets all the non saved variables
-        '''
-        print('Finding trial names...')
-        self._extract_trial_names()
-        super().set(1)
-
     def _extract_trial_names(self):
         '''
         Find the trial names of experiments from the saved trial file
