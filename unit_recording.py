@@ -4,11 +4,11 @@ import numpy as np
 from spiking import Cluster
 import csv
 from recording import Recording, bandpass_data
+from sniff_shift import *
 import openephys as oe
 from scipy.signal import find_peaks, resample
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from plotter import Plotter
 
 class Unit_Recording(Recording):
     def __init__(self, home_dir, channel_count, trial_length, *, fs=30000, dat_name='100_CHs.dat', 
@@ -51,7 +51,15 @@ class Unit_Recording(Recording):
         home_dir = self.home_dir
         spike_clusters = np.load(os.path.join(home_dir, 'spike_clusters.npy'))
         spike_templates = np.load(os.path.join(home_dir, 'spike_templates.npy'))
-        spike_times = np.load(os.path.join(home_dir, 'spike_times.npy'))
+        if self.sniff_basis:
+            if os.path.isfile(os.path.join(self.home_dir, 'spike_times_sb.npy')):
+                spike_times = np.load(os.path.join(home_dir, 'spike_times_sb.npy'))
+            else:
+                spike_times = np.load(os.path.join(home_dir, 'spike_times.npy'))
+                spike_times = spikes_to_sb(spike_times, self.resp_peaks)
+                np.save(os.path.join(home_dir, 'spike_times_sb.npy'), spike_times)
+        else:
+            spike_times = np.load(os.path.join(home_dir, 'spike_times.npy'))
         channel_map = self.channel_map
         templates = np.load(os.path.join(home_dir, 'templates.npy'))
         cluster_tsv = os.path.join(home_dir, 'cluster_group.tsv')
@@ -72,11 +80,6 @@ class Unit_Recording(Recording):
         # Find the cluster number and label
             cluster_num = int(cluster_row[0])
             c_label = cluster_row[1]
-            if sniff_spikes:
-                c_sniff_spikes = sniff_locked_spikes[(sniff_cluster_nums == cluster_num)][0]
-            else:
-                c_sniff_spikes = None
-
             # Find the times and templates
             c_times = spike_times[(spike_clusters == cluster_num)]
             c_temps_index = spike_templates[(spike_clusters == cluster_num)]
@@ -155,6 +158,7 @@ class Unit_Recording(Recording):
     def find_trial_starts(self):
         trial_starts = None
         trial_ends = None
+        
         if os.path.isfile(os.path.join(self.home_dir, 'trial_starts.npy')):
             print('Found file starts')
             trial_starts = np.load(os.path.join(self.home_dir, 'trial_starts.npy'))
@@ -182,6 +186,16 @@ class Unit_Recording(Recording):
             print('Saving starts and ends')
             np.save(os.path.join(self.home_dir, 'trial_starts.npy'), trial_starts)
             np.save(os.path.join(self.home_dir, 'trial_ends.npy'), trial_starts)
+        if self.sniff_basis:
+            if os.path.isfile(os.path.join(self.home_dir, 'trial_starts_sb.npy')):
+                trial_starts = np.load(os.path.join(self.home_dir, 'trial_starts_sb.npy'))
+            if os.path.isfile(os.path.join(self.home_dir, 'trial_ends_sb.npy')):
+                trial_ends  = np.load(os.path.join(self.home_dir, 'trial_ends_sb.npy'))
+            else:
+                trial_starts, trial_ends = starts_to_sb(trial_starts, trial_ends, self.resp_peaks)
+                np.save(os.path.join(self.home_dir, 'trial_starts_sb.npy'), trial_starts)
+                np.save(os.path.join(self.home_dir, 'trial_ends_sb.npy'), trial_ends)
+
         return trial_starts, trial_ends    
 
     def find_respiration_peaks(self):

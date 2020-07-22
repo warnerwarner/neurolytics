@@ -33,3 +33,5 @@ class Binary_recording(Unit_Recording):
                 print('Found %d trials in trial name file' % len(trial_lines))
         else:
             print('trials are already trials')
+
+    
