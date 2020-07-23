@@ -60,6 +60,9 @@ class Unit_Recording(Recording):
                 np.save(os.path.join(home_dir, 'spike_times_sb.npy'), spike_times)
         else:
             spike_times = np.load(os.path.join(home_dir, 'spike_times.npy'))
+        
+        spike_clusters = spike_clusters[-len(spike_times):]
+        spike_templates = spike_templates[-len(spike_times):]
         channel_map = self.channel_map
         templates = np.load(os.path.join(home_dir, 'templates.npy'))
         cluster_tsv = os.path.join(home_dir, 'cluster_group.tsv')
@@ -71,6 +74,7 @@ class Unit_Recording(Recording):
             sniff_spikes = True
         else:
             window = input('No sniff locked average, please enter (s) a window prior to trials to be used')
+            window = float(window)
             sniff_spikes = False
         next(tsv_read)
         clusters = []
@@ -206,7 +210,7 @@ class Unit_Recording(Recording):
         else:
             print('Finding respiration peaks from raw file')
             resp = oe.loadContinuous2(os.path.join(self.home_dir, resp_channel))['data']
-            bp_data = bandpass_data(resp, highcut=100, lowcut=1)
+            bp_data = bandpass_data(resp, highcut=500, lowcut=1)
             respiration_peaks = find_peaks(bp_data, height=np.std(bp_data), prominence=np.std(bp_data))[0]
             np.save(os.path.join(self.home_dir, 'respiration_peaks.npy'), respiration_peaks)
         return respiration_peaks
@@ -250,6 +254,14 @@ class Unit_Recording(Recording):
             raise ValueError('Trial name not in trial names')
         return [j for i, j in zip(self.trial_names, self.trial_starts) if i == trial_name]
 
+    def get_unique_trial_ends(self, trial_name):
+        try:
+            assert trial_name in self.trial_names  # Don't know why this throws a warning, it does work
+        except (AssertionError):
+            raise ValueError('Trial name not in trial names')
+        return [j for i, j in zip(self.trial_names, self.trial_ends) if i == trial_name]
+
+
     def get_cluster_trial_response(self, trial_name, cluster, *, pre_trial_window=None, post_trial_window=None, real_time=True):
         if isinstance(cluster, (int, float)):
             cluster = self.get_cluster(cluster)
@@ -266,8 +278,9 @@ class Unit_Recording(Recording):
                 window_start = start - pre_trial_window*self.fs
                 window_end = start + (post_trial_window+self.trial_length)*self.fs
             else:
-                window_start = int(start - pre_trial_window)
-                window_end = int(start + post_trial_window)
+                window_start = start - pre_trial_window
+                window_end = start + post_trial_window
+                real_time = False
             trial_spikes = cluster_spikes[(cluster_spikes >= window_start) & (cluster_spikes <= window_end)]
             trial_spikes = [i - start for i in trial_spikes]
             if real_time:
