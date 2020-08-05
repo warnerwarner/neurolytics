@@ -7,19 +7,20 @@ import matplotlib.pyplot as plt
 
 class Recording():
     '''
-    A bit of a mess right now, base for recording objects
-    Holds general information about a recording
-
-    Arguments:
-    home_dir - The directory of the recording, expected to contain the binary recording file
-    channel_count - The number of channels in the recording
-    fs=30000 - the sampling rate
-    dat_name=100_CHs.dat - the name of the dat file containing the raw recording
-    conversion_factor=0.195 - the bitvolt conversion factor from the raw data
+    Superclass for other recording classes, can be used as a default
     '''
 
     def __init__(self, home_dir, channel_count, *, fs=30000, dat_name='100_CHs.dat',
                  resp_channel='100_ADC6.continuous', conversion_factor=0.195):
+        """
+        Args:
+            home_dir (str): Location of the directory the recording data is in
+            channel_count (int): Number of channels used in the recording
+            fs (int, optional): Sampling rate of the recording. Defaults to 30000.
+            dat_name (str, optional): Name of the dat file of the recording. Defaults to '100_CHs.dat'.
+            resp_channel (str, optional): Name of the channel containing the respiration trace. Defaults to '100_ADC6.continuous'.
+            conversion_factor (float, optional): Value to convert between binary to volts. Defaults to 0.195.
+        """
         self.home_dir = home_dir
         self.channel_count = channel_count
         self.fs = fs
@@ -30,9 +31,9 @@ class Recording():
         self.resp_channel = resp_channel
 
     def load_dat(self):
-        '''
-        Load the dat data file in as a memmap
-        '''
+        """
+        Loads the dat into a memmap
+        """
 
         data = np.memmap(os.path.join(self.home_dir, self.dat_name), dtype=np.int16)
         try:
@@ -46,15 +47,19 @@ class Recording():
 
 
 def bandpass_data(data, *, lowcut=300, highcut=6000, fs=30000, order=3):
-    '''
+    """
     Bandpass data using a butterworth filter
 
-    data - Raw data to filter - can be ndarray
-    lowcut=300 - Lowcut frequency
-    highcut=6000 - Highcut frequency
-    fs=30000 - Sampling rate
-    order=3 - Order for the filter
-    '''
+    Args:
+        data (array): Data to bandpass
+        lowcut (int, optional): Lowcut value for filter. Defaults to 300.
+        highcut (int, optional): Highcut value for the filter. Defaults to 6000.
+        fs (int, optional): Sampling rate of the data. Defaults to 30000.
+        order (int, optional): Order of the butterworth filter, high is a stronger filtering. Defaults to 3.
+
+    Returns:
+        y (array): The bandpassed signal
+    """
     nyq = 0.5*fs
     low = lowcut/nyq
     high = highcut/nyq

@@ -8,24 +8,30 @@ from scipy.signal import find_peaks
 
 
 class Correlation_Recording(Unit_Recording):
+    """
+    Represents a single Correlation Recording experiment
+    """
 
     def __init__(self, home_dir, channel_count, trialbank_loc, *, trial_length=2, trig_chan='100_ADC6.continuous', **kwargs):
+        """
+        Args:
+            home_dir (str): Location of the home directory for the experiment
+            channel_count (int): Number of channels used in the recording
+            trialbank_loc (str): Location of the trialbank pickle file
+            trial_length (int, optional): Length of the trials. Defaults to 2.
+            trig_chan (str, optional): Trigger channel, used to find trial starts. Defaults to '100_ADC6.continuous'.
+        """
+
         Unit_Recording.__init__(self, home_dir, channel_count, trial_length, **kwargs)
         self.trialbank_loc = trialbank_loc
         self.trial_length = trial_length
         self.trig_chan = trig_chan
-        self.trial_starts = None
-        self.trial_ends = None
-        self.trial_names = None
-        self.repeats = None
-        self.resp_peaks = None
+        self.extract_trial_names()
 
-    def set(self):
-        super().set(self.trial_length*2)
-        print('extracting trial names')
-        self._extract_trial_names()
-
-    def _extract_trial_names(self):
+    def extract_trial_names(self):
+        """
+        Extracts the trial names from the trialbank pickle into an array
+        """
         trialbank = pickle.Unpickler(open(self.trialbank_loc, 'rb')).load()
         trial_names = [i[-1] for i in trialbank]
         repeats = int(len(self.trial_starts)/len(trial_names))

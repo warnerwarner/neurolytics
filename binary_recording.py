@@ -44,16 +44,44 @@ class Binary_recording(Unit_Recording):
 
     
     def get_guassian_response(self, trial_name, cluster, *, pre_trial_window=None, post_trial_window=None, sd_denom=50):
+        """
+        Gets responses of a cluster to a trial in and then convolves it with a guassian around each spike
+        Args:
+            trial_name (str): The name of the trial to collect responses for
+            cluster (int or Cluster): The cluster, if an int calls get_cluster to find the corresponding Cluster
+            pre_trial_window (float, optional): Size of the window before the trial start to consider. If None then
+                                                takes 2*trial length. Defaults to None.
+            post_trial_window (float, optional): Size of the window after the trial ends to consider. If None then takes
+                                                 2*trial length. Defaults to None.
+            sd_denom (int, optional): The denomination for the standard deviation for each Guassian. Smaller values lead
+                                      to larger guassians and vice versa. Defaults to 50.
+
+        Returns:
+            xs (array): Time points for x, trial starts at 0
+            guasses (array): Array of arrays containing guassian convolutions for each trial
+            trial_ends (array): Times trials end for each trial
+        """
         guasses = []
+        # Converts to a Cluster if needs to.
         if isinstance(cluster, (int, float)):
             cluster = self.get_cluster(cluster)
-        trial_spikes = self.get_cluster_trial_response(trial_name, cluster, pre_trial_window=pre_trial_window, post_trial_window=post_trial_window)
+
+        # Find the spike times, ends and starts
+        trial_spikes = self.get_cluster_trial_response(trial_name, 
+                                                       cluster,
+                                                       pre_trial_window=pre_trial_window,
+                                                       post_trial_window=post_trial_window)
         trial_ends = self.get_unique_trial_ends(trial_name)
         trial_starts = self.get_unique_trial_starts(trial_name)
         trial_ends = [i-j for i, j in zip(trial_ends, trial_starts)]
+
+        # Construct the x axis values, hard coded currently as 1/1000 points per time interval (second or sniff)
         xs = np.arange(-1*pre_trial_window, post_trial_window+self.trial_length, 1/1000)
+
+        # Runs through each trial
         for trial in trial_spikes:
-            trial_guasses = [norm(spike, 1/sd_denom).pdf(xs) for spike in trial]
-            trial_guasses.append(np.zeros(len(xs)))
+            # Generates a guassian over the full x range for each spike
+            trial_guasses = [norm(spike, 1/sd_denom).pdf(xs) for spike in trial] 
+            trial_guasses.append(np.zeros(len(xs)))  # Make one series of zeros in case there are no spikes at all =
             guasses.append(np.mean(trial_guasses, axis=0))
         return xs, guasses, trial_ends

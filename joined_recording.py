@@ -1,6 +1,3 @@
-# Class to combine between experiments - still a work in progress
-# Assumes that all experiments added are of the same type
-
 from unit_recording import Unit_Recording
 from pydoc import locate
 import numpy as np
@@ -13,6 +10,10 @@ class JoinedRecording():
     '''
 
     def __init__(self, recordings):
+        """
+        Args:
+            recordings (array): Array of Recording objectes, can be of any type
+        """
         self.recordings = recordings
         self.recordings_type = type(recordings[0])
         self.num_of_recordings = len(recordings)
@@ -31,21 +32,24 @@ class JoinedRecording():
         self.trial_names = trial_names
 
     def get_binned_trial_response(self, trial_name, *, pre_trial_window=None, post_trial_window=None, bin_size=0.01, baselined=False, w_nans=False, w_bootstrap=False, saved_trial=False):
-        '''
-        Returns binned responses from units across all recordings for a specific trial (if the trial is present in the recording).
-        Arguments:
-        trial_names: The name of the trial
-        
-        Optional arguments:
-        pre_trial_window: The window prior to the trial to include
-        post_trial_window: The windows post the trial to include
-        bin_size: Size of the bins to use
-        baselined: Should the response be baselined subtracted, only works if there is a pre_trial_windows > 0
-        w_nans: Even mismatched repeat sizes by inserting nans into the arrays
-        w_bootstrap: Even mismatched repeat sizes by bootstrapping data
-        saved_trial: Should a trial be kept out of the bootstrapping, useful for classifiers
-        '''
-        
+        """
+        Gets the binned responses of all units to a trial
+
+        Args:
+            trial_name (str): Name of trial
+            pre_trial_window (float, optional): The length of window to take prior to the trial. Defaults to None.
+            post_trial_window (float, optional): The length of the window to take post the end of the trial. Defaults to None.
+            bin_size (float, optional): Size of bins. Defaults to 0.01.
+            baselined (bool, optional): Subtract the baseline predicted activity. Defaults to False.
+            w_nans (bool, optional): Fill mismatched repeats with nans. Defaults to False.
+            w_bootstrap (bool, optional): Fill mismatched repeats using bootstrap. Defaults to False.
+            saved_trial (bool, optional): Leave a trial out of any bootstrapping. Defaults to False.
+
+        Returns:
+            xs (array): Time values corresponding to the trial responses
+            rec_responses (array): Array of array of binned responses for each cluster during each trial
+            all_saved_trials (array, optional): If saved_trial is true then also returns the saved trials
+        """        
         assert trial_name in self.trial_names, 'Trial is not in any recording'
         rec_responses = []
         for recording in self.recordings:
@@ -150,6 +154,16 @@ class JoinedRecording():
 
 
     def get_trial_response(self, trial_name, pre_trial_window=0.5, post_trial_window=0.5):
+        """
+        Gets the response of all clusters to a trial type (in spike times)
+        Args:
+            trial_name ([type]): [description]
+            pre_trial_window (float, optional): [description]. Defaults to 0.5.
+            post_trial_window (float, optional): [description]. Defaults to 0.5.
+
+        Returns:
+            [type]: [description]
+        """
         assert trial_name in self.trial_names, 'Trial is not in any recording'
         rec_responses = []
         for recording in self.recordings:

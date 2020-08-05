@@ -10,16 +10,42 @@ class Spiking():
     Hold spike times, and recording directory of spiking object
     '''
     def __init__(self, spike_times, recording_dir, *, dat_name='100_CHs.dat'):
+        """
+        Args:
+            spike_times (array of ints): Times of spikes. 
+            recording_dir (str): Directory of the recording the Spiking is from
+            dat_name (str, optional): Name of the dat file associated with the recording. Defaults to '100_CHs.dat'.
+        """
         self.spike_times = spike_times
         self.recording_dir = recording_dir
         self.amplitudes = None
         self.dat_name = dat_name
 
     def get_firing_rate(self, exp_length, *, bin_size=1, fs=30000):
+        """
+        Finds the firing rate
+
+        Args:
+            exp_length (int): Length of the experiment (in samples)
+            bin_size (int, optional): Size of the bin to use (in seconds). Defaults to 1.
+            fs (int, optional): Sampling rate of the recording. Defaults to 30000.
+
+        Returns:
+            xs (array of floats): The time series associated with the firing values
+            ys (array of floats): Instanteous firing rate
+        """
         ys, xs = np.histogram(self.spike_times/fs, bins=np.arange(0, exp_length, bin_size))
         return xs[:-1], ys/bin_size
 
     def plot_firing_rate(self, exp_length, *, ax=None, bin_size=1):
+        """
+        Depreciated. Plot the firing rate (don't use)
+
+        Args:
+            exp_length (int): Length of experiment (in samples)
+            ax (Axis, optional): Axis to plot on. Defaults to None.
+            bin_size (int, optional): Size of bin for histogram. Defaults to 1.
+        """
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
@@ -27,20 +53,19 @@ class Spiking():
         ax.plot(xs, ys)
     
     def get_waveforms(self, *, data=None, chan_count=32, pre_window=30, post_window=60, zeroing='first'):
-        '''
+        """
         Gets all the waveforms from a raw recording, very fast (at least on CAMP)
 
-        Arguments:
-        cluster: Which cluster to find the spikes from, can be a Cluster object, or a cluster number
-        Optional arguments:
-        pre_window: The window size prior to the spike time to include, in ms, default 1
-        post_window: The window size post to the spike time to include, in ms, default 2
-        zeroing: Method for removing offset, can be:
+        Args:
+        cluster (int or Cluster): Which cluster to find the spikes from, can be a Cluster object, or a cluster number
+        pre_window (float, optional): The window size prior to the spike time to include, in ms. Defaults to 1
+        post_window (float, optional): The window size post to the spike time to include, in ms. Defaults to 2
+        zeroing (str, optional): Method for removing offset, can be. Defaults to 'first':
             - 'first', sets the first value from each spike snippet to zero, default
             - 'mean', sets the mean of each spike to zero
             - 'median', sets the median of each spike to zero
             - None, does nothing
-        '''
+        """
         # Check if the cluster is a number, and if it is change it to an Cluster
         spike_times = self.spike_times
 
@@ -83,6 +108,16 @@ class Spiking():
         return waveforms
     
     def get_recording_length(self, *, chan_count=32, fs=30000):
+        """
+        Get the length of a recording
+
+        Args:
+            chan_count (int, optional): Number of channels. Defaults to 32.
+            fs (int, optional): Sampling rate. Defaults to 30000.
+
+        Returns:
+            recording length (float): Length of recording (in seconds)
+        """
         data = np.memmamp(os.path.join(self.recording_dir, self.dat_name), dtype=np.int16)
         return len(data)/chan_count/fs
 
@@ -96,6 +131,18 @@ class Cluster(Spiking):
 
     def __init__(self, cluster_num, times, recording_dir, label, template_ind,
                  template, max_chan, *, sniff_lock_spikes=None, dat_name='100_CHs.dat'):
+        """
+        Args:
+            cluster_num (int): Cluster number
+            times (array of ints): Detected spike times
+            recording_dir (str): Location of the recording directory
+            label (str): Label of the unit, can be 'good', 'MUA', or 'noise'
+            template_ind (int): Template indicie(s) associated with cluster
+            template (arrays of floats): Template for cluster
+            max_chan (int): Largest channel
+            sniff_lock_spikes (array of floats, optional): All spikes as a fraction of sniff phase. Defaults to None.
+            dat_name (str, optional): Name of dat that Cluster was derived from. Defaults to '100_CHs.dat'.
+        """
         Spiking.__init__(self, times, recording_dir, dat_name=dat_name)
         self.cluster_num = cluster_num
         self.label = label
@@ -114,6 +161,15 @@ class ThresholdCrossings(Spiking):
 
     def __init__(self, times, recording_dir, channel_num, threshold, *, 
                  spike_thresholds=None, dat_name='100_CHs.dat'):
+        """
+        Args:
+            times (array of ints): Threshold crossing times
+            recording_dir (str): Location of recording directory
+            channel_num (int): Number of channels in recording
+            threshold (float): The threshold for spikes
+            spike_thresholds (array of floats, optional): The amount of times over threshold a spike was. Defaults to None.
+            dat_name (str, optional): Name of the dat file. Defaults to '100_CHs.dat'.
+        """
         Spiking.__init__(self, times, recording_dir, dat_name=dat_name)
         self.channel_num = channel_num
         self.threshold = threshold

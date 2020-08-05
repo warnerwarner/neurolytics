@@ -1,5 +1,5 @@
 '''
-TODO - PCA classifier up into train and test data
+Depreciated
 '''
 
 from sklearn.decomposition import PCA
