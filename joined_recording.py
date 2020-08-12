@@ -31,7 +31,8 @@ class JoinedRecording():
         trial_names = list(set(np.concatenate(trial_names)))
         self.trial_names = trial_names
 
-    def get_binned_trial_response(self, trial_name, *, pre_trial_window=None, post_trial_window=None, bin_size=0.01, baselined=False, w_nans=False, w_bootstrap=False, saved_trial=False):
+    def get_binned_trial_response(self, trial_name, *, pre_trial_window=None, post_trial_window=None, bin_size=0.01, baselined=False, 
+                                  w_nans=False, w_bootstrap=False, saved_trial=False, bootstrap_limit=100):
         """
         Gets the binned responses of all units to a trial
 
@@ -44,6 +45,8 @@ class JoinedRecording():
             w_nans (bool, optional): Fill mismatched repeats with nans. Defaults to False.
             w_bootstrap (bool, optional): Fill mismatched repeats using bootstrap. Defaults to False.
             saved_trial (bool, optional): Leave a trial out of any bootstrapping. Defaults to False.
+            bootstrap_limit(int, optional): How many times the maximum number of repeats should all trials be bootstrapped to.
+                                            Greater values increase data size but decrease random sampling error. Default to 100.
 
         Returns:
             xs (array): Time values corresponding to the trial responses
@@ -102,7 +105,7 @@ class JoinedRecording():
 
         ### Bootstrap all the data to make it an even length
         if w_bootstrap:
-            bootstrap_size = max(repeat_lengths) * 2
+            bootstrap_size = max(repeat_lengths) * bootstrap_limit
             if saved_trial:  # If there is an trial to be kept out, reduces the bootstrapping size by 
                 bootstrap_size -= 2
             resampled_responses = []
