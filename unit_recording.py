@@ -247,6 +247,9 @@ class Unit_Recording(Recording):
     def get_unique_trial_names(self):
         return list(set(self.trial_names))
 
+    def get_num_trial_repeats(self, trial_name):
+        return len(np.array(self.trial_names)[np.array(self.trial_names == trial_name)])
+
     def get_unique_trial_starts(self, trial_name):
         try:
             assert trial_name in self.trial_names  # Don't know why this throws a warning, it does work
