@@ -98,7 +98,7 @@ class JoinedRecording():
                     nump_response = np.empty(empty_response_shape)
                     nump_response[:] = np.NaN
                     rec_responses.insert(recording_index, nump_response)
-            rec_responses = np.concatenate(rec_responses, axis=1)
+            #rec_responses = np.concatenate(rec_responses, axis=1)
 
         ### Bootstrap all the data to make it an even length
         if w_bootstrap:

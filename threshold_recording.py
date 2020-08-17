@@ -6,7 +6,6 @@ from scipy import signal
 import matplotlib.pyplot as plt
 import time
 import os
-import seaborn as sns
 from spiking import ThresholdCrossings
 from copy import deepcopy
 from tqdm import tqdm
