@@ -512,3 +512,31 @@ class Unit_Recording(Recording):
         ax.set_xlabel('Sniff cycle phase')
         ax.set_xlim(0, 1)
         ax.set_ylim(0)
+
+
+    def all_firing_rate_plot(self, *, ax=None, min_base=True, bin_size=60, normalised=False, individual=True):
+        if ax is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        all_frs = []
+        for cluster in self.get_good_clusters():
+            xs, frs = cluster.get_firing_rate(bin_size=bin_size)
+            if normalised:
+                frs = frs/max(frs)
+            all_frs.append(frs)
+        if individual:
+            for i in frs:
+                ax.plot(xs, frs, color='gray', alpha=0.5)
+        ax.plot(xs, np.mean(frs, axis=0))
+        if min_base:
+            xs = xs/60
+            xlim = self.rec_length/60
+            basis = 'mins'
+        else:
+            xlim = self.rec_length
+            basis = 's'
+        
+        
+            
+
+        
