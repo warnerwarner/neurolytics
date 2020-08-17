@@ -2,6 +2,7 @@ from unit_recording import Unit_Recording
 from scipy.signal import find_peaks
 import spiking
 import numpy as np
+import matplotlib.pyplot as plt
 import openephys as oe
 from threshold_recording import bandpass_data
 import os
@@ -85,3 +86,21 @@ class Binary_recording(Unit_Recording):
             trial_guasses.append(np.zeros(len(xs)))  # Make one series of zeros in case there are no spikes at all =
             guasses.append(np.mean(trial_guasses, axis=0))
         return xs, guasses, trial_ends
+
+    
+def binary_plotter(bin_val, *, ax=None, num_of_bins=5, bin_width=20):
+    bin_val = str(bin(bin_val)[2:])
+    while len(bin_val) < num_of_bins:
+        bin_val = '0' + bin_val
+    
+    if ax is None:
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+
+    pulses = [np.ones(bin_width)*int(i) for i in bin_val]
+    onset = np.zeros(bin_width)
+    offset = np.zeros(bin_width)
+    output = np.hstack([onset, np.hstack(pulses), offset])
+    plt.plot(output)
+    plt.axvspan(bin_width, len(output)-bin_width, alpha=0.3, color='gray')
+    return output
