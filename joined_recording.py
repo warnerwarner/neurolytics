@@ -148,11 +148,9 @@ class JoinedRecording():
         saved_trials = np.concatenate(saved_trials, axis=0)
         return bootstrapped_trials, saved_trials        
 
-    def get_multi_trial_response(self, trial_names, *, super_bootstrap_limit=None,**kwargs):
+    def get_multi_trial_response(self, trial_names, *, super_bootstrap_limit=None, super_saved_trial=False, **kwargs):
         assert all(i in self.trial_names for i in trial_names), "One or more trial names not present in any recording"
-
         trial_response = [self.get_binned_trial_response(i, **kwargs)[1] for i in trial_names]
-
         # Runs if the groups of responses need to be bootstrapped together
         if super_bootstrap_limit is not None:
             conj_trial_response = trial_response[0]
@@ -161,7 +159,13 @@ class JoinedRecording():
                 conj_trial_response = [np.concatenate([i, j]) for i, j in zip(conj_trial_response, exp)]
 
             res_rec = []
+            all_saved_trials = []
             for rec in conj_trial_response:
+                if super_saved_trial:
+                    saved_index = np.random.randint(len(rec))
+                    saved_trial = rec[i]
+                    all_saved_trials.append(saved_trial)
+                    rec = np.array(rec)[np.arange(len(rec)) != saved_index]
                 bs_rec = [rec[i] for i in np.random.randint(0, len(rec), size=super_bootstrap_limit)]
                 empt_rec = []
                 for i in range(len(bs_rec[0])):
@@ -170,6 +174,8 @@ class JoinedRecording():
             res_rec = np.concatenate(res_rec)    
             trial_response = res_rec
 
+        if super_saved_trial:
+            return trial_response, all_saved_trials
         return trial_response
 
 
