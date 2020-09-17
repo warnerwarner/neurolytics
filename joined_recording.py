@@ -109,15 +109,13 @@ class JoinedRecording():
                 print('Bootstrapping limit too small, increasing to repeat limit')
                 bootstrap_limit = max(repeat_lengths)
             bootstrap_size = bootstrap_limit
-            if saved_trial:  # If there is an trial to be kept out, reduces the bootstrapping size by 
-                bootstrap_size -= 1
             resampled_responses = []
             all_saved_trials = []
             for rec in rec_responses:
                 if saved_trial:
                     saved_index = np.random.randint(len(rec))
-                    saved_trial = rec[i]
-                    all_saved_trials.append(saved_trial)
+                    saved_t = rec[saved_index]
+                    all_saved_trials.append(saved_t)
                     rec = np.array(rec)[np.arange(len(rec)) != saved_index]
                 resampled_rec = [rec[i] for i in np.random.randint(0, len(rec), size=bootstrap_size)]
                 resampled_responses.append(resampled_rec)
