@@ -29,7 +29,7 @@ class Unit_Recording(Recording):
             sniff_locked (bool, optional): Is the recording sniff locked (?) - dont know where this is from. Defaults to False.
         """
         Recording.__init__(self, home_dir, channel_count, fs=fs, resp_channel=resp_channel, dat_name=dat_name, conversion_factor=conversion_factor)
-        self.channel_map = np.load(os.path.join(home_dir, 'channel_map.npy'))
+        self.channel_map = np.load(os.path.join(home_dir, 'channel_map.npy')).flatten()
         self.channel_positions = np.load(os.path.join(home_dir, 'channel_positions.npy'))
         self.sniff_basis = sniff_basis
         self.trial_length = trial_length
@@ -80,10 +80,18 @@ class Unit_Recording(Recording):
         clusters = []
         all_sniff_locks = []
         cluster_nums = []
+        all_clust_numbers = list(set(spike_clusters.flatten()))
+        labelled_clusters = []
+        labelled_groups = []
         for cluster_row in tsv_read:
+            labelled_groups.append(cluster_row[1])
+            labelled_clusters.append(int(cluster_row[0]))
+        for cluster_num in all_clust_numbers:
+            if cluster_num in labelled_clusters:
+                c_label = labelled_groups[np.where(cluster_num == np.array(labelled_clusters))[0][0]]
+            else:
+                c_label = 'mua'
         # Find the cluster number and label
-            cluster_num = int(cluster_row[0])
-            c_label = cluster_row[1]
             # Find the times and templates
             c_times = spike_times[(spike_clusters == cluster_num)]
             c_temps_index = spike_templates[(spike_clusters == cluster_num)]
@@ -189,7 +197,7 @@ class Unit_Recording(Recording):
             trial_starts = np.array(trial_starts)
             print('Saving starts and ends')
             np.save(os.path.join(self.home_dir, 'trial_starts.npy'), trial_starts)
-            np.save(os.path.join(self.home_dir, 'trial_ends.npy'), trial_starts)
+            np.save(os.path.join(self.home_dir, 'trial_ends.npy'), trial_ends)
         if self.sniff_basis:
             if os.path.isfile(os.path.join(self.home_dir, 'trial_starts_sb.npy')):
                 trial_starts = np.load(os.path.join(self.home_dir, 'trial_starts_sb.npy'))
@@ -199,8 +207,8 @@ class Unit_Recording(Recording):
                 trial_starts, trial_ends = starts_to_sb(trial_starts, trial_ends, self.resp_peaks)
                 np.save(os.path.join(self.home_dir, 'trial_starts_sb.npy'), trial_starts)
                 np.save(os.path.join(self.home_dir, 'trial_ends_sb.npy'), trial_ends)
-
-        return trial_starts, trial_ends    
+            self.trial_length = np.mean(trial_ends-trial_starts)
+        return trial_starts, trial_ends
 
     def find_respiration_peaks(self):
         resp_channel = self.resp_channel
@@ -229,7 +237,7 @@ class Unit_Recording(Recording):
         return respiration_trace
 
     def get_sniff_lock_avg(self, cluster, pre_trial_window):
-        if isinstance(cluster, (int, float)):
+        if isinstance(cluster, (int, float, np.int32, np.uint32)):
             cluster = self.get_cluster(cluster)            
         trial_starts = self.trial_starts
         resp_peaks = self.resp_peaks
@@ -241,6 +249,7 @@ class Unit_Recording(Recording):
                 sniff_spikes = spike_times[(spike_times >= i) & (spike_times < j)]
                 sniff_spikes = [(k-i)/(j-i) for k in sniff_spikes]
                 single_sniff_spikes.append(sniff_spikes)
+        #print(len(single_sniff_spikes), len(trial_starts))
         single_sniff_spikes = np.hstack(single_sniff_spikes)
         return single_sniff_spikes
 
@@ -266,7 +275,7 @@ class Unit_Recording(Recording):
 
 
     def get_cluster_trial_response(self, trial_name, cluster, *, pre_trial_window=None, post_trial_window=None, real_time=True):
-        if isinstance(cluster, (int, float)):
+        if isinstance(cluster, (int, float, np.int32, np.uint32)):
             cluster = self.get_cluster(cluster)
         cluster_spikes = cluster.spike_times
         starts = self.get_unique_trial_starts(trial_name)
@@ -331,7 +340,7 @@ class Unit_Recording(Recording):
 
 
     def get_binned_trial_response(self, trial_name, cluster, *, pre_trial_window=None, post_trial_window=None, real_time=True, bin_size=0.01, baselined=True):
-        if isinstance(cluster, (int, float)):
+        if isinstance(cluster, (int, float, np.int32, np.uint32)):
             cluster = self.get_cluster(cluster)
 
         if pre_trial_window is None:
@@ -344,6 +353,9 @@ class Unit_Recording(Recording):
             assert self.resp_peaks is not None, "No respiration peaks"
             assert not self.sniff_basis, 'Sniff basis baseline not implemented as yet'
 
+        if self.sniff_basis:
+            real_time=False
+
         cluster_spikes = cluster.spike_times
         sniff_locked_spikes = cluster.sniff_lock_spikes
         starts = self.get_unique_trial_starts(trial_name)
@@ -351,14 +363,19 @@ class Unit_Recording(Recording):
         resp_peaks = self.resp_peaks
         #base_hist = np.histogram(cluster.sniff_lock_spikes, bins=np.arange(0, 1.01, 0.01))
         for start in starts:
-            window_start = int(start - pre_trial_window*self.fs)
-            window_end = int(start + (self.trial_length + post_trial_window)*self.fs)
+            if self.sniff_basis:
+                window_start = start - pre_trial_window
+                window_end = start + post_trial_window
+                bins = np.arange(-1*pre_trial_window, post_trial_window+bin_size, bin_size)
+            else:
+                window_start = int(start - pre_trial_window*self.fs)
+                window_end = int(start + (self.trial_length + post_trial_window)*self.fs)
+                bins=np.arange(-1*pre_trial_window, self.trial_length+post_trial_window+bin_size, bin_size)
             trial_spikes = cluster_spikes[(cluster_spikes >= window_start) & (cluster_spikes <= window_end)]
             trial_spikes = [i - start for i in trial_spikes]
             if real_time:
                 trial_spikes = [i/self.fs for i in trial_spikes]
-            true_y, true_x = np.histogram(trial_spikes, bins=np.arange(-1*pre_trial_window, self.trial_length+post_trial_window+bin_size, bin_size))
-            
+            true_y, true_x = np.histogram(trial_spikes, bins=bins)
             if baselined:
                 assert pre_trial_window > 0, 'Cannot apply baseline subtraction with no baseline'
                 trial_peaks = resp_peaks[(resp_peaks > window_start-pre_trial_window*self.fs) & (resp_peaks < window_end+post_trial_window*self.fs)]
@@ -538,8 +555,3 @@ class Unit_Recording(Recording):
         else:
             xlim = self.rec_length
             basis = 's'
-        
-        
-            
-
-        
