@@ -118,7 +118,7 @@ class Spiking():
         Returns:
             recording length (float): Length of recording (in seconds)
         """
-        data = np.memmamp(os.path.join(self.recording_dir, self.dat_name), dtype=np.int16)
+        data = np.memmap(os.path.join(self.recording_dir, self.dat_name), dtype=np.int16)
         return len(data)/chan_count/fs
 
 

@@ -7,3 +7,8 @@ neurolytics.sublime-workspace
 __pycache__/cluster.cpython-37.pyc
 __pycache__/recording.cpython-37.pyc
 __pycache__/spiking.cpython-37.pyc
+*.pyi
+.gitignore
+.gitignore
+*.gitignore
+*.pyc

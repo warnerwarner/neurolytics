@@ -7,7 +7,7 @@ import openephys as oe
 from threshold_recording import bandpass_data
 import os
 from scipy.stats import norm
-
+import joined_recording as jr
 
 class Binary_recording(Unit_Recording):
     '''
@@ -87,7 +87,6 @@ class Binary_recording(Unit_Recording):
             guasses.append(np.mean(trial_guasses, axis=0))
         return xs, guasses, trial_ends
 
-    
 def binary_plotter(bin_val, *, ax=None, num_of_bins=5, bin_width=20):
     bin_val = str(bin(bin_val)[2:])
     while len(bin_val) < num_of_bins:
