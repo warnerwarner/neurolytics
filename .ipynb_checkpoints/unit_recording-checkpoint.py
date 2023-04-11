@@ -29,7 +29,7 @@ class Unit_Recording(Recording):
             sniff_locked (bool, optional): Is the recording sniff locked (?) - dont know where this is from. Defaults to False.
         """
         Recording.__init__(self, home_dir, channel_count, fs=fs, resp_channel=resp_channel, dat_name=dat_name, conversion_factor=conversion_factor)
-        self.channel_map = np.load(os.path.join(home_dir, 'channel_map.npy')).flatten()
+        self.channel_map = np.load(os.path.join(home_dir, 'channel_map.npy'))
         self.channel_positions = np.load(os.path.join(home_dir, 'channel_positions.npy'))
         self.sniff_basis = sniff_basis
         self.trial_length = trial_length
@@ -80,18 +80,10 @@ class Unit_Recording(Recording):
         clusters = []
         all_sniff_locks = []
         cluster_nums = []
-        all_clust_numbers = list(set(spike_clusters.flatten()))
-        labelled_clusters = []
-        labelled_groups = []
         for cluster_row in tsv_read:
-            labelled_groups.append(cluster_row[1])
-            labelled_clusters.append(int(cluster_row[0]))
-        for cluster_num in all_clust_numbers:
-            if cluster_num in labelled_clusters:
-                c_label = labelled_groups[np.where(cluster_num == np.array(labelled_clusters))[0][0]]
-            else:
-                c_label = 'mua'
         # Find the cluster number and label
+            cluster_num = int(cluster_row[0])
+            c_label = cluster_row[1]
             # Find the times and templates
             c_times = spike_times[(spike_clusters == cluster_num)]
             c_temps_index = spike_templates[(spike_clusters == cluster_num)]
@@ -237,7 +229,7 @@ class Unit_Recording(Recording):
         return respiration_trace
 
     def get_sniff_lock_avg(self, cluster, pre_trial_window):
-        if isinstance(cluster, (int, float, np.int32, np.uint32)):
+        if isinstance(cluster, (int, float)):
             cluster = self.get_cluster(cluster)            
         trial_starts = self.trial_starts
         resp_peaks = self.resp_peaks
@@ -249,7 +241,6 @@ class Unit_Recording(Recording):
                 sniff_spikes = spike_times[(spike_times >= i) & (spike_times < j)]
                 sniff_spikes = [(k-i)/(j-i) for k in sniff_spikes]
                 single_sniff_spikes.append(sniff_spikes)
-        #print(len(single_sniff_spikes), len(trial_starts))
         single_sniff_spikes = np.hstack(single_sniff_spikes)
         return single_sniff_spikes
 
@@ -275,7 +266,7 @@ class Unit_Recording(Recording):
 
 
     def get_cluster_trial_response(self, trial_name, cluster, *, pre_trial_window=None, post_trial_window=None, real_time=True):
-        if isinstance(cluster, (int, float, np.int32, np.uint32)):
+        if isinstance(cluster, (int, float)):
             cluster = self.get_cluster(cluster)
         cluster_spikes = cluster.spike_times
         starts = self.get_unique_trial_starts(trial_name)
@@ -340,7 +331,7 @@ class Unit_Recording(Recording):
 
 
     def get_binned_trial_response(self, trial_name, cluster, *, pre_trial_window=None, post_trial_window=None, real_time=True, bin_size=0.01, baselined=True):
-        if isinstance(cluster, (int, float, np.int32, np.uint32)):
+        if isinstance(cluster, (int, float)):
             cluster = self.get_cluster(cluster)
 
         if pre_trial_window is None:
